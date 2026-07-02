@@ -53,22 +53,29 @@ export function Button({
   onClick,
   variant = 'primary',
   className = '',
+  disabled = false,
+  title,
 }: {
   children: ReactNode
   onClick?: () => void
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   className?: string
+  disabled?: boolean
+  title?: string
 }) {
   const variants = {
-    primary: 'bg-slate-900 text-white hover:bg-slate-700',
-    secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-    ghost: 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
-    danger: 'bg-rose-600 text-white hover:bg-rose-500',
+    primary: 'bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-50',
+    secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50',
+    ghost: 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50',
+    danger: 'bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50',
   }
   return (
     <button
+      type="button"
+      title={title}
+      disabled={disabled}
       onClick={onClick}
-      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${variants[variant]} ${className}`}
+      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed ${variants[variant]} ${className}`}
     >
       {children}
     </button>

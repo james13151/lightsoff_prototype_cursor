@@ -4,12 +4,40 @@ An interactive prototype of **LightsOff**, the AI-driven brand operating system 
 
 ## Run it
 
+### Demo mode (in-memory, no backend)
+
 ```bash
 npm install
 npm run dev
 ```
 
-Then open the printed local URL (default `http://localhost:5173`).
+Open `http://localhost:5173` — uses seeded data, no database required.
+
+### Live mode (Inventory + Finance from real API/DB)
+
+**Terminal 1 — API** (from repo root, Postgres with migrations applied):
+
+```bash
+cd api && npm install
+cp .env.example .env   # set DATABASE_URL, JWT_SECRET, APP_ENCRYPTION_KEY, ALLOW_DEV_AUTH=true
+npm run dev
+```
+
+**Terminal 2 — Frontend:**
+
+```bash
+cd lightsoff && npm install
+cp .env.example .env   # VITE_API_URL=/api (Vite proxies to localhost:3001)
+npm run dev
+```
+
+Open `http://localhost:5173` → **Connect** screen → pick or create a workspace → click **+ seed** to add a vendor + SKU.
+
+- **Inventory, Finance, Event Bus** load from Postgres via the API
+- **Inbox, Marketing, R&D, Collab** remain demo data until Phase 2/3
+- Sidebar shows `Live — Inventory + Finance from DB` when connected
+
+For production: set `VITE_API_URL` to your Railway API URL at build time; use Supabase Auth tokens instead of dev auth.
 
 ## What's in the prototype
 
@@ -39,9 +67,10 @@ Confidence-aware automation (spec §1.5) is adjustable in **AI Settings**: the a
 
 ## What's simulated
 
-- The AI classifier (`src/ai/classify.ts`) is deterministic rules standing in for an LLM call, so demos behave predictably.
-- Shopify / Meta / WhatsApp integrations are represented by seeded data and simulated sync events — no external calls.
-- State is in-memory (refresh resets to the seeded scenario).
+- The AI classifier (`src/ai/classify.ts`) is deterministic rules standing in for an LLM call
+- **Phase 2/3 modules** (Inbox, Marketing, R&D, Collab) use in-memory seed data even in live mode
+- Shopify / Meta / WhatsApp integrations are not connected yet
+- In demo mode (no `VITE_API_URL`), all state is in-memory and resets on refresh
 
 ## Stack
 

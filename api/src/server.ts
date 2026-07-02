@@ -1,13 +1,24 @@
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 import { requireAuth } from './auth.js'
 import { withUser } from './db.js'
 import { inventoryRoutes } from './routes/inventory.js'
 import { financeRoutes } from './routes/finance.js'
+import { registerDevAuth } from './devAuth.js'
+import { env } from './env.js'
 
 export function buildServer() {
   const app = Fastify({ logger: true })
 
-  app.get('/health', async () => ({ ok: true, service: 'lightsoff-api' }))
+  app.register(cors, {
+    origin: true, // reflect request origin — fine for prototype; tighten for production
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+  })
+
+  app.get('/health', async () => ({ ok: true, service: 'lightsoff-api', devAuth: env.allowDevAuth }))
+
+  registerDevAuth(app)
 
   app.register(async (authed) => {
     authed.addHook('preHandler', requireAuth)

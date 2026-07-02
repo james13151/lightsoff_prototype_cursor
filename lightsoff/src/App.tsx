@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
+import type { AuthSession } from './api/config'
 import { CaptureBar } from './components/CaptureBar'
 import { Digest } from './components/Digest'
 import { Inventory } from './components/Inventory'
@@ -39,8 +40,16 @@ const NAV_ITEMS: { view: View; label: string; icon: string; group: string }[] = 
   { view: 'settings', label: 'AI Settings', icon: '⚙️', group: 'System' },
 ]
 
-export default function App() {
-  const { state, dispatch } = useStore()
+export default function App({
+  auth,
+  mode,
+  onDisconnect,
+}: {
+  auth: AuthSession | null
+  mode: 'demo' | 'live'
+  onDisconnect: () => void
+}) {
+  const { state, dispatch, loading } = useStore()
   const [nav, setNav] = useState<Nav>({ view: 'digest' })
 
   useEffect(() => {
@@ -114,9 +123,16 @@ export default function App() {
         </nav>
         <div className="absolute bottom-0 left-0 right-0 border-t border-slate-100 px-5 py-3">
           <div className="text-[11px] text-slate-400">
-            Tenant: <span className="font-medium text-slate-600">solo-brand.myshopify.com</span>
+            Tenant: <span className="font-medium text-slate-600">{auth?.tenantName ?? 'demo (in-memory)'}</span>
           </div>
-          <div className="mt-0.5 text-[11px] text-emerald-600">● Shopify sync live (simulated)</div>
+          <div className={`mt-0.5 text-[11px] ${mode === 'live' ? 'text-emerald-600' : 'text-amber-600'}`}>
+            ● {mode === 'live' ? (loading ? 'Syncing with API…' : 'Live — Inventory + Finance from DB') : 'Demo mode — in-memory seed data'}
+          </div>
+          {mode === 'live' && (
+            <button onClick={onDisconnect} className="mt-1 text-[11px] text-slate-400 underline cursor-pointer">
+              Disconnect
+            </button>
+          )}
         </div>
       </aside>
 

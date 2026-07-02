@@ -1,10 +1,12 @@
-import { createContext, useContext, useReducer, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useReducer, useState, type ReactNode } from 'react'
 import type {
   Vendor, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
   Settings, CaptureDraft, CardStage,
 } from './types'
 import * as seed from './data/seed'
+import type { AuthSession } from './api/config'
+import { fetchSpineSnapshot, executeSpineAction, type SpineSnapshot, type FinanceSummary } from './api/spine'
 
 export interface AppState {
   vendors: Vendor[]
@@ -23,6 +25,7 @@ export interface AppState {
   settings: Settings
   dismissedDigest: string[]
   toast: string | null
+  financeSummary: FinanceSummary | null
 }
 
 const initialState: AppState = {
@@ -42,6 +45,7 @@ const initialState: AppState = {
   settings: { confidenceThreshold: 0.85, autoApplyEnabled: true },
   dismissedDigest: [],
   toast: null,
+  financeSummary: null,
 }
 
 type Action =
@@ -59,6 +63,7 @@ type Action =
   | { type: 'SET_THRESHOLD'; value: number }
   | { type: 'SET_AUTO_APPLY'; value: boolean }
   | { type: 'SET_TOAST'; message: string | null }
+  | { type: 'HYDRATE'; spine: SpineSnapshot }
 
 let seq = 1000
 const nid = (prefix: string) => `${prefix}-${++seq}`
@@ -212,6 +217,20 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, settings: { ...state.settings, autoApplyEnabled: action.value } }
     case 'SET_TOAST':
       return { ...state, toast: action.message }
+    case 'HYDRATE':
+      return {
+        ...state,
+        vendors: action.spine.vendors,
+        products: action.spine.products,
+        purchaseOrders: action.spine.purchaseOrders,
+        receipts: action.spine.receipts,
+        ledger: action.spine.ledger,
+        bills: action.spine.bills,
+        journal: action.spine.journal,
+        claims: action.spine.claims,
+        events: action.spine.events,
+        financeSummary: action.spine.financeSummary,
+      }
     default:
       return state
   }
@@ -384,11 +403,89 @@ function applyCapture(state: AppState, draft: CaptureDraft): AppState {
   }
 }
 
-const StoreContext = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } | null>(null)
+const StoreContext = createContext<{
+  state: AppState
+  dispatch: (action: Action) => void | Promise<void>
+  refresh: () => Promise<void>
+  mode: 'demo' | 'live'
+  loading: boolean
+} | null>(null)
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState)
-  return <StoreContext.Provider value={{ state, dispatch }}>{children}</StoreContext.Provider>
+const SPINE_ACTIONS = new Set(['PAY_BILL', 'APPROVE_CLAIM', 'REJECT_CLAIM', 'CREATE_REORDER_PO'])
+const SPINE_CAPTURE = new Set(['inventory_receipt', 'sample_receipt', 'vendor_bill', 'expense_claim'])
+
+function toastFor(action: Action): string {
+  switch (action.type) {
+    case 'PAY_BILL': return 'Payment recorded — journal entry auto-posted.'
+    case 'APPROVE_CLAIM': return 'Claim approved and posted.'
+    case 'REJECT_CLAIM': return 'Claim rejected.'
+    case 'CREATE_REORDER_PO': return 'Reorder PO drafted and sent.'
+    case 'APPLY_CAPTURE': return 'Capture applied.'
+    default: return 'Done.'
+  }
+}
+
+export function StoreProvider({
+  children,
+  auth,
+  mode,
+}: {
+  children: ReactNode
+  auth: AuthSession | null
+  mode: 'demo' | 'live'
+}) {
+  const [state, rawDispatch] = useReducer(reducer, initialState)
+  const [loading, setLoading] = useState(false)
+
+  const refresh = useCallback(async () => {
+    if (mode !== 'live' || !auth) return
+    setLoading(true)
+    try {
+      const spine = await fetchSpineSnapshot(auth.token, auth.tenantId)
+      rawDispatch({ type: 'HYDRATE', spine })
+    } finally {
+      setLoading(false)
+    }
+  }, [auth, mode])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  const dispatch = useCallback(
+    async (action: Action) => {
+      const isLiveSpine =
+        mode === 'live' &&
+        auth &&
+        (SPINE_ACTIONS.has(action.type) ||
+          (action.type === 'APPLY_CAPTURE' && SPINE_CAPTURE.has(action.draft.intent)))
+
+      if (isLiveSpine) {
+        try {
+          await executeSpineAction(
+            auth!.token,
+            auth!.tenantId,
+            action,
+            { bills: state.bills, purchaseOrders: state.purchaseOrders, settings: state.settings, vendors: state.vendors, products: state.products },
+            action.type === 'APPLY_CAPTURE' ? action.draft : undefined,
+          )
+          await refresh()
+          rawDispatch({ type: 'SET_TOAST', message: toastFor(action) })
+        } catch (err) {
+          rawDispatch({ type: 'SET_TOAST', message: (err as Error).message })
+        }
+        return
+      }
+      rawDispatch(action)
+    },
+    [mode, auth, state.bills, state.purchaseOrders, state.settings, state.vendors, state.products, refresh],
+  )
+
+  return (
+    <StoreContext.Provider value={{ state, dispatch, refresh, mode, loading }}>
+      {children}
+    </StoreContext.Provider>
+  )
 }
 
 export function useStore() {

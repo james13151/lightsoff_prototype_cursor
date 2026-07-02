@@ -14,7 +14,9 @@ export function Finance() {
   const { state, dispatch } = useStore()
   const { cash, revenue30d, expenses30d } = cashPosition(state)
   const vendorName = (id: string) => state.vendors.find((v) => v.id === id)?.name ?? '—'
-  const unpaidTotal = state.bills.filter((b) => b.status === 'unpaid').reduce((s, b) => s + b.amount, 0)
+  const unpaidTotal = state.bills
+    .filter((b) => b.status === 'unpaid' || b.status === 'partially_paid')
+    .reduce((s, b) => s + b.amount - (b.amountPaid ?? 0), 0)
 
   return (
     <div className="space-y-8">
@@ -26,7 +28,7 @@ export function Finance() {
           <Stat label="Cash" value={`$${cash.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} tone="text-emerald-600" />
           <Stat label="Revenue (30d)" value={`$${revenue30d.toLocaleString()}`} />
           <Stat label="Expenses (30d)" value={`$${expenses30d.toLocaleString()}`} />
-          <Stat label="AP outstanding" value={`$${unpaidTotal.toLocaleString()}`} sub={`${state.bills.filter((b) => b.status === 'unpaid').length} unpaid bills`} tone="text-amber-600" />
+          <Stat label="AP outstanding" value={`$${unpaidTotal.toLocaleString()}`} sub={`${state.bills.filter((b) => b.status === 'unpaid' || b.status === 'partially_paid').length} open bills`} tone="text-amber-600" />
         </div>
       </div>
 
@@ -41,12 +43,12 @@ export function Finance() {
               <Card key={b.id} className="p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-sm font-semibold">{b.id}</span>
-                  <Badge tone={b.status === 'paid' ? 'emerald' : days <= 3 ? 'rose' : 'amber'}>
-                    {b.status === 'paid' ? 'paid' : `due ${days >= 0 ? `in ${days}d` : `${-days}d ago`}`}
+                  <Badge tone={b.status === 'paid' ? 'emerald' : b.status === 'partially_paid' ? 'sky' : days <= 3 ? 'rose' : 'amber'}>
+                    {b.status === 'paid' ? 'paid' : b.status === 'partially_paid' ? `partially paid ($${(b.amountPaid ?? 0).toFixed(0)}/${b.amount.toFixed(0)})` : `due ${days >= 0 ? `in ${days}d` : `${-days}d ago`}`}
                   </Badge>
                   <span className="text-sm text-slate-600">{vendorName(b.vendorId)} — {b.memo}</span>
                   <span className="ml-auto text-sm font-semibold">${b.amount.toFixed(2)}</span>
-                  {b.status === 'unpaid' && !b.anomaly && (
+                  {b.status !== 'paid' && !b.anomaly && (
                     <Button variant="secondary" onClick={() => dispatch({ type: 'PAY_BILL', billId: b.id })}>Pay</Button>
                   )}
                 </div>
