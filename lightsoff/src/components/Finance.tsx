@@ -28,6 +28,8 @@ const DEMO_ACCOUNTS: AccountOption[] = [
   { id: '6900', code: '6900', name: 'General Expense', type: 'expense' },
 ]
 
+import type { VendorBillLine } from '../types'
+
 interface JournalLineDraft {
   accountCode: string
   debit: string
@@ -44,11 +46,14 @@ export function Finance() {
 
   const [accounts, setAccounts] = useState<AccountOption[]>(DEMO_ACCOUNTS)
   const [billVendor, setBillVendor] = useState('')
-  const [billAmount, setBillAmount] = useState('')
+  const [billPo, setBillPo] = useState('')
+  const [billNumber, setBillNumber] = useState('')
   const [billDue, setBillDue] = useState('')
   const [billMemo, setBillMemo] = useState('')
-  const [payBill, setPayBill] = useState('')
-  const [payAmount, setPayAmount] = useState('')
+  const [billLines, setBillLines] = useState([{ description: '', productId: '', qty: '1', unitCost: '' }])
+  const [payVendor, setPayVendor] = useState('')
+  const [payMemo, setPayMemo] = useState('')
+  const [payAllocations, setPayAllocations] = useState([{ billId: '', amount: '' }])
   const [claimVendor, setClaimVendor] = useState('')
   const [claimAmount, setClaimAmount] = useState('')
   const [claimCategory, setClaimCategory] = useState<string>(EXPENSE_CATEGORIES[3].code)
@@ -68,38 +73,72 @@ export function Finance() {
     }
   }, [mode, auth])
 
+  function loadBillLinesFromPo(poId: string) {
+    const po = state.purchaseOrders.find((p) => p.id === poId)
+    if (!po) return
+    setBillVendor(po.vendorId)
+    setBillLines(po.lines.map((l) => ({
+      description: state.products.find((p) => p.id === l.productId)?.name ?? 'PO line',
+      productId: l.productId,
+      qty: String(l.qty),
+      unitCost: String(l.unitCost),
+    })))
+  }
+
   async function onCreateBill(e: FormEvent) {
     e.preventDefault()
     const vendorId = billVendor || defaultVendor
-    const amount = Number(billAmount)
-    if (!vendorId || !amount) return
+    const lines: VendorBillLine[] = billLines
+      .map((l) => {
+        const qty = Number(l.qty) || 1
+        const unitCost = Number(l.unitCost) || 0
+        return {
+          description: l.description || undefined,
+          productId: l.productId || undefined,
+          qty,
+          unitCost,
+          lineAmount: qty * unitCost,
+          poLineItemId: billPo ? state.purchaseOrders.find((p) => p.id === billPo)?.lines.find((pl) => pl.productId === l.productId)?.id : undefined,
+        }
+      })
+      .filter((l) => l.lineAmount > 0)
+    if (!vendorId || lines.length === 0) return
+    const total = lines.reduce((s, l) => s + l.lineAmount, 0)
     await spineMutate(
       () => createBill(auth!.token, auth!.tenantId, {
         vendorId,
-        amount,
+        lines,
+        billNumber: billNumber || undefined,
+        poId: billPo || undefined,
         dueDate: billDue || undefined,
         memo: billMemo || undefined,
       }),
-      { type: 'CREATE_BILL', vendorId, amount, dueDate: billDue || undefined, memo: billMemo || undefined },
+      { type: 'CREATE_BILL', vendorId, amount: total, dueDate: billDue || undefined, memo: billMemo || undefined },
     )
-    setBillAmount('')
     setBillMemo('')
+    setBillNumber('')
   }
+
+  const payTotal = payAllocations.reduce((s, a) => s + (Number(a.amount) || 0), 0)
 
   async function onRecordPayment(e: FormEvent) {
     e.preventDefault()
-    const bill = state.bills.find((b) => b.id === payBill)
-    if (!bill) return
-    const amount = Number(payAmount) || bill.amount - (bill.amountPaid ?? 0)
+    const vendorId = payVendor || defaultVendor
+    const allocations = payAllocations
+      .map((a) => ({ billId: a.billId, amount: Number(a.amount) }))
+      .filter((a) => a.billId && a.amount > 0)
+    if (!vendorId || allocations.length === 0 || payTotal <= 0) return
     await spineMutate(
       () => recordPayment(auth!.token, auth!.tenantId, {
-        vendorId: bill.vendorId,
-        amount,
-        billId: bill.id,
+        vendorId,
+        amount: payTotal,
+        allocations,
+        memo: payMemo || undefined,
       }),
-      { type: 'PAY_BILL', billId: bill.id },
+      { type: 'PAY_BILL', billId: allocations[0].billId },
     )
-    setPayAmount('')
+    setPayAllocations([{ billId: '', amount: '' }])
+    setPayMemo('')
   }
 
   async function onCreateClaim(e: FormEvent) {
@@ -185,45 +224,98 @@ export function Finance() {
           Quick actions
         </SectionTitle>
         <div className="grid gap-3 lg:grid-cols-2">
-          <form onSubmit={onCreateBill}>
-            <FormPanel title="Add vendor bill">
-              <Field label="Vendor">
-                <Select value={billVendor || defaultVendor} onChange={(e) => setBillVendor(e.target.value)}>
-                  {state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
-              </Field>
+          <form onSubmit={onCreateBill} className="lg:col-span-2">
+            <FormPanel title="Add vendor bill (header + lines)">
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Amount">
-                  <Input type="number" step="0.01" value={billAmount} onChange={(e) => setBillAmount(e.target.value)} required />
+                <Field label="Vendor">
+                  <Select value={billVendor || defaultVendor} onChange={(e) => setBillVendor(e.target.value)}>
+                    {state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Link to PO">
+                  <Select value={billPo} onChange={(e) => { setBillPo(e.target.value); if (e.target.value) loadBillLinesFromPo(e.target.value) }}>
+                    <option value="">— none —</option>
+                    {state.purchaseOrders.map((po) => (
+                      <option key={po.id} value={po.id}>{po.poNumber ?? po.id.slice(0, 8)} ({po.status})</option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Bill number">
+                  <Input value={billNumber} onChange={(e) => setBillNumber(e.target.value)} placeholder="INV-1234" />
                 </Field>
                 <Field label="Due date">
                   <Input type="date" value={billDue} onChange={(e) => setBillDue(e.target.value)} />
                 </Field>
               </div>
               <Field label="Memo">
-                <Input value={billMemo} onChange={(e) => setBillMemo(e.target.value)} placeholder="INV-1234" />
+                <Input value={billMemo} onChange={(e) => setBillMemo(e.target.value)} placeholder="Vendor invoice memo" />
               </Field>
+              <div className="space-y-2">
+                {billLines.map((line, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_72px_88px_auto] gap-2 items-end">
+                    <Field label={i === 0 ? 'Line description' : ''}>
+                      <Input value={line.description} onChange={(e) => setBillLines((rows) => rows.map((r, j) => j === i ? { ...r, description: e.target.value } : r))} />
+                    </Field>
+                    <Field label={i === 0 ? 'Qty' : ''}>
+                      <Input type="number" step="0.001" value={line.qty} onChange={(e) => setBillLines((rows) => rows.map((r, j) => j === i ? { ...r, qty: e.target.value } : r))} />
+                    </Field>
+                    <Field label={i === 0 ? 'Unit cost' : ''}>
+                      <Input type="number" step="0.01" value={line.unitCost} onChange={(e) => setBillLines((rows) => rows.map((r, j) => j === i ? { ...r, unitCost: e.target.value } : r))} />
+                    </Field>
+                    {billLines.length > 1 && (
+                      <Button type="button" variant="ghost" onClick={() => setBillLines((rows) => rows.filter((_, j) => j !== i))}>×</Button>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="ghost" onClick={() => setBillLines((rows) => [...rows, { description: '', productId: '', qty: '1', unitCost: '' }])}>+ line</Button>
+              </div>
+              <p className="text-xs text-slate-500">
+                Total: ${billLines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitCost) || 0), 0).toFixed(2)}
+              </p>
               <Button type="submit" className="w-full">Create bill</Button>
             </FormPanel>
           </form>
 
-          <form onSubmit={onRecordPayment}>
-            <FormPanel title="Record payment">
-              <Field label="Bill">
-                <Select value={payBill || openBills[0]?.id || ''} onChange={(e) => setPayBill(e.target.value)} required>
-                  {openBills.length === 0 ? (
-                    <option value="">No open bills</option>
-                  ) : openBills.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {vendorName(b.vendorId)} — ${b.amount.toFixed(2)} ({b.status})
-                    </option>
-                  ))}
+          <form onSubmit={onRecordPayment} className="lg:col-span-2">
+            <FormPanel title="Record payment (multi-bill allocations)">
+              <Field label="Vendor">
+                <Select value={payVendor || defaultVendor} onChange={(e) => setPayVendor(e.target.value)}>
+                  {state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                 </Select>
               </Field>
-              <Field label="Amount (defaults to remaining balance)">
-                <Input type="number" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="full balance" />
+              <div className="space-y-2">
+                {payAllocations.map((row, i) => {
+                  const bill = openBills.find((b) => b.id === row.billId) ?? openBills[0]
+                  const remaining = bill ? bill.amount - (bill.amountPaid ?? 0) : 0
+                  return (
+                    <div key={i} className="grid grid-cols-[1fr_100px_auto] gap-2 items-end">
+                      <Field label={i === 0 ? 'Bill' : ''}>
+                        <Select value={row.billId || bill?.id || ''} onChange={(e) => setPayAllocations((rows) => rows.map((r, j) => j === i ? { ...r, billId: e.target.value, amount: r.amount || String(remaining) } : r))}>
+                          {openBills.length === 0 ? <option value="">No open bills</option> : openBills.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.billNumber ?? b.id.slice(0, 8)} — ${b.amount.toFixed(2)} ({b.status}, due ${(b.amount - (b.amountPaid ?? 0)).toFixed(2)})
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field label={i === 0 ? 'Amount' : ''}>
+                        <Input type="number" step="0.01" value={row.amount} onChange={(e) => setPayAllocations((rows) => rows.map((r, j) => j === i ? { ...r, amount: e.target.value } : r))} placeholder={String(remaining)} />
+                      </Field>
+                      {payAllocations.length > 1 && (
+                        <Button type="button" variant="ghost" onClick={() => setPayAllocations((rows) => rows.filter((_, j) => j !== i))}>×</Button>
+                      )}
+                    </div>
+                  )
+                })}
+                <Button type="button" variant="ghost" onClick={() => setPayAllocations((rows) => [...rows, { billId: openBills[0]?.id ?? '', amount: '' }])}>+ allocation</Button>
+              </div>
+              <Field label="Memo">
+                <Input value={payMemo} onChange={(e) => setPayMemo(e.target.value)} placeholder="Check #1234" />
               </Field>
-              <Button type="submit" className="w-full" disabled={openBills.length === 0}>Record payment</Button>
+              <p className="text-xs text-slate-500">Payment total: ${payTotal.toFixed(2)}</p>
+              <Button type="submit" className="w-full" disabled={openBills.length === 0 || payTotal <= 0}>Record payment</Button>
             </FormPanel>
           </form>
 
@@ -304,7 +396,8 @@ export function Finance() {
             return (
               <Card key={b.id} className="p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold">{b.id.slice(0, 8)}…</span>
+                  <span className="font-mono text-sm font-semibold">{b.billNumber ?? b.id.slice(0, 8) + '…'}</span>
+                  {b.poNumber && <Badge tone="sky">PO {b.poNumber}</Badge>}
                   <Badge tone={b.status === 'paid' ? 'emerald' : b.status === 'partially_paid' ? 'sky' : days <= 3 ? 'rose' : 'amber'}>
                     {b.status === 'paid' ? 'paid' : b.status === 'partially_paid' ? `partially paid ($${(b.amountPaid ?? 0).toFixed(0)}/${b.amount.toFixed(0)})` : `due ${days >= 0 ? `in ${days}d` : `${-days}d ago`}`}
                   </Badge>
@@ -314,6 +407,24 @@ export function Finance() {
                     <Button variant="secondary" onClick={() => dispatch({ type: 'PAY_BILL', billId: b.id })}>Pay</Button>
                   )}
                 </div>
+                {b.lines && b.lines.length > 0 && (
+                  <table className="mt-2 w-full text-xs text-slate-600">
+                    <tbody>
+                      {b.lines.map((l) => (
+                        <tr key={l.id ?? l.lineNumber} className="border-t border-slate-50">
+                          <td className="py-1">{l.description ?? 'Line'}</td>
+                          <td className="py-1 text-right">{l.qty} × ${l.unitCost.toFixed(2)}</td>
+                          <td className="py-1 text-right font-medium">${l.lineAmount.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {b.payments && b.payments.length > 0 && (
+                  <div className="mt-1 text-xs text-slate-500">
+                    Payments: {b.payments.map((p) => `$${p.amount.toFixed(2)}`).join(', ')}
+                  </div>
+                )}
                 {b.anomaly && (
                   <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2">
                     <span className="text-sm text-rose-700">⚠ {b.anomaly}</span>
@@ -325,6 +436,30 @@ export function Finance() {
               </Card>
             )
           })}
+        </div>
+      </div>
+
+      <div>
+        <SectionTitle sub="Payments allocate to one or more bills — partial amounts supported.">
+          Payment history
+        </SectionTitle>
+        <div className="space-y-2.5">
+          {state.payments.length === 0 ? (
+            <Card className="p-4 text-sm text-slate-400">No payments recorded yet.</Card>
+          ) : state.payments.map((p) => (
+            <Card key={p.id} className="p-4 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono font-semibold">{p.id.slice(0, 8)}…</span>
+                <Badge tone="slate">{p.method}</Badge>
+                <span>{vendorName(p.vendorId)}</span>
+                <span className="ml-auto font-semibold">${p.amount.toFixed(2)}</span>
+                <span className="text-xs text-slate-400">{timeAgo(p.paidAt)}</span>
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                {p.allocations.map((a) => `${a.billNumber ?? a.billId.slice(0, 8)}: $${a.amount.toFixed(2)}`).join(' · ')}
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
 

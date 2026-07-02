@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useState, type ReactNode } from 'react'
 import type {
-  Vendor, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
+  Vendor, Product, ProductMaster, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill, VendorPayment,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
   Settings, CaptureDraft, CardStage,
 } from './types'
@@ -11,10 +11,12 @@ import { fetchSpineSnapshot, executeSpineAction, type SpineSnapshot, type Financ
 export interface AppState {
   vendors: Vendor[]
   products: Product[]
+  productMasters: ProductMaster[]
   purchaseOrders: PurchaseOrder[]
   receipts: Receipt[]
   ledger: InventoryLedgerEntry[]
   bills: VendorBill[]
+  payments: VendorPayment[]
   journal: JournalEntry[]
   claims: ExpenseClaim[]
   campaigns: Campaign[]
@@ -31,10 +33,12 @@ export interface AppState {
 const initialState: AppState = {
   vendors: seed.vendors,
   products: seed.products,
+  productMasters: [],
   purchaseOrders: seed.purchaseOrders,
   receipts: seed.receipts,
   ledger: seed.ledger,
   bills: seed.bills,
+  payments: [],
   journal: seed.journal,
   claims: seed.claims,
   campaigns: seed.campaigns,
@@ -230,10 +234,12 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         vendors: action.spine.vendors,
         products: action.spine.products,
+        productMasters: action.spine.productMasters,
         purchaseOrders: action.spine.purchaseOrders,
         receipts: action.spine.receipts,
         ledger: action.spine.ledger,
         bills: action.spine.bills,
+        payments: action.spine.payments,
         journal: action.spine.journal,
         claims: action.spine.claims,
         events: action.spine.events,

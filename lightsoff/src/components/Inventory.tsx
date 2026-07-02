@@ -6,6 +6,8 @@ import {
 import {
   Badge, Button, Card, Field, FormPanel, Input, SectionTitle, Select, timeAgo,
 } from './ui'
+import { cartesianProduct } from '../lib/matrix'
+import type { POLineItem } from '../types'
 
 const PO_STATUS_TONE: Record<string, string> = {
   draft: 'slate', sent: 'sky', partially_received: 'amber', received: 'emerald', closed: 'slate',
@@ -19,14 +21,19 @@ export function Inventory() {
   const [vendorNameInput, setVendorNameInput] = useState('')
   const [vendorLead, setVendorLead] = useState('14')
   const [productTitle, setProductTitle] = useState('')
+  const [productBrand, setProductBrand] = useState('')
+  const [productDesc, setProductDesc] = useState('')
   const [productSku, setProductSku] = useState('')
   const [productPrice, setProductPrice] = useState('')
   const [productCost, setProductCost] = useState('')
   const [productReorder, setProductReorder] = useState('0')
+  const [opt1Name, setOpt1Name] = useState('Size')
+  const [opt1Values, setOpt1Values] = useState('')
+  const [opt2Name, setOpt2Name] = useState('Color')
+  const [opt2Values, setOpt2Values] = useState('')
   const [poVendor, setPoVendor] = useState('')
-  const [poVariant, setPoVariant] = useState('')
-  const [poQty, setPoQty] = useState('50')
-  const [poCost, setPoCost] = useState('')
+  const [poNumber, setPoNumber] = useState('')
+  const [poLines, setPoLines] = useState([{ productId: '', qty: '50', unitCost: '' }])
   const [poSend, setPoSend] = useState(true)
   const [rcvVendor, setRcvVendor] = useState('')
   const [rcvPo, setRcvPo] = useState('')
@@ -57,10 +64,17 @@ export function Inventory() {
     const price = Number(productPrice) || 0
     const unitCost = Number(productCost) || 0
     const reorderPoint = Number(productReorder) || 0
+    const options = [
+      opt1Name.trim() && opt1Values.trim() ? { name: opt1Name.trim(), values: opt1Values.split(',').map((s) => s.trim()).filter(Boolean) } : null,
+      opt2Name.trim() && opt2Values.trim() ? { name: opt2Name.trim(), values: opt2Values.split(',').map((s) => s.trim()).filter(Boolean) } : null,
+    ].filter(Boolean) as { name: string; values: string[] }[]
     await spineMutate(
       () => createProduct(auth!.token, auth!.tenantId, {
         title: productTitle.trim(),
-        sku: productSku.trim(),
+        brand: productBrand.trim() || undefined,
+        description: productDesc.trim() || undefined,
+        baseSku: productSku.trim(),
+        options,
         price,
         unitCost,
         reorderPoint,
@@ -68,35 +82,45 @@ export function Inventory() {
       { type: 'ADD_PRODUCT', title: productTitle.trim(), sku: productSku.trim(), price, unitCost, reorderPoint },
     )
     setProductTitle('')
+    setProductBrand('')
+    setProductDesc('')
     setProductSku('')
-    setProductPrice('')
-    setProductCost('')
+    setOpt1Values('')
+    setOpt2Values('')
   }
 
   async function onCreatePo(e: FormEvent) {
     e.preventDefault()
     const vendorId = poVendor || defaultVendor
-    const variantId = poVariant || defaultVariant
-    const qty = Number(poQty)
-    const unitCost = Number(poCost) || productById(variantId)?.unitCost || 0
-    if (!vendorId || !variantId || !qty) return
+    const lines: POLineItem[] = poLines
+      .map((l) => ({
+        productId: l.productId || defaultVariant,
+        qty: Number(l.qty),
+        unitCost: Number(l.unitCost) || productById(l.productId || defaultVariant)?.unitCost || 0,
+      }))
+      .filter((l) => l.productId && l.qty > 0)
+    if (!vendorId || lines.length === 0) return
+    const first = lines[0]
     await spineMutate(
       () => createPurchaseOrder(auth!.token, auth!.tenantId, {
         vendorId,
-        lines: [{ variantId, qty, unitCost }],
+        lines,
+        poNumber: poNumber || undefined,
         send: poSend,
       }),
-      { type: 'CREATE_PO', vendorId, variantId, qty, unitCost, send: poSend },
+      { type: 'CREATE_PO', vendorId, variantId: first.productId, qty: first.qty, unitCost: first.unitCost, send: poSend },
     )
   }
 
   async function onReceive(e: FormEvent) {
     e.preventDefault()
     const vendorId = rcvVendor || defaultVendor
-    const variantId = rcvVariant || defaultVariant
     const qty = Number(rcvQty)
     if (!vendorId || !qty) return
     const isSample = rcvType === 'sample'
+    const po = state.purchaseOrders.find((p) => p.id === rcvPo)
+    const poLine = po?.lines[0]
+    const variantId = rcvVariant || poLine?.productId || defaultVariant
     await spineMutate(
       () => createReceipt(auth!.token, auth!.tenantId, {
         vendorId,
@@ -104,7 +128,7 @@ export function Inventory() {
         type: rcvType,
         lines: isSample
           ? [{ description: 'Sample item', qty }]
-          : [{ variantId, qty }],
+          : [{ variantId, qty, poLineItemId: poLine?.id }],
       }),
       {
         type: 'CREATE_RECEIPT',
@@ -150,50 +174,96 @@ export function Inventory() {
             </FormPanel>
           </form>
 
-          <form onSubmit={onAddProduct}>
-            <FormPanel title="Add product">
-              <Field label="Product title">
-                <Input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} placeholder="Blue Hoodie" required />
+          <form onSubmit={onAddProduct} className="lg:col-span-2">
+            <FormPanel title="Add product (master + variant matrix)">
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Product title">
+                  <Input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} placeholder="Blue Hoodie" required />
+                </Field>
+                <Field label="Brand">
+                  <Input value={productBrand} onChange={(e) => setProductBrand(e.target.value)} placeholder="Acme" />
+                </Field>
+              </div>
+              <Field label="Description">
+                <Input value={productDesc} onChange={(e) => setProductDesc(e.target.value)} placeholder="Midweight fleece hoodie" />
               </Field>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="SKU">
-                  <Input value={productSku} onChange={(e) => setProductSku(e.target.value)} placeholder="HOOD-BLU-M" required />
+                <Field label="Base SKU">
+                  <Input value={productSku} onChange={(e) => setProductSku(e.target.value)} placeholder="HOOD-BLU" required />
                 </Field>
                 <Field label="Reorder pt">
                   <Input type="number" value={productReorder} onChange={(e) => setProductReorder(e.target.value)} min={0} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Price">
-                  <Input type="number" step="0.01" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="68" />
+                <Field label="Price (all variants)">
+                  <Input type="number" step="0.01" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} />
                 </Field>
                 <Field label="Unit cost">
-                  <Input type="number" step="0.01" value={productCost} onChange={(e) => setProductCost(e.target.value)} placeholder="18.50" />
+                  <Input type="number" step="0.01" value={productCost} onChange={(e) => setProductCost(e.target.value)} />
                 </Field>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                <div className="mb-2 text-xs font-medium text-slate-500">Variant options (comma-separated values)</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Option 1 name">
+                    <Input value={opt1Name} onChange={(e) => setOpt1Name(e.target.value)} placeholder="Size" />
+                  </Field>
+                  <Field label="Values">
+                    <Input value={opt1Values} onChange={(e) => setOpt1Values(e.target.value)} placeholder="S, M, L" />
+                  </Field>
+                  <Field label="Option 2 name">
+                    <Input value={opt2Name} onChange={(e) => setOpt2Name(e.target.value)} placeholder="Color" />
+                  </Field>
+                  <Field label="Values">
+                    <Input value={opt2Values} onChange={(e) => setOpt2Values(e.target.value)} placeholder="Blue, Black" />
+                  </Field>
+                </div>
+                {(opt1Values || opt2Values) && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Will generate {cartesianProduct([
+                      opt1Name.trim() && opt1Values.trim() ? { name: opt1Name.trim(), values: opt1Values.split(',').map((s) => s.trim()).filter(Boolean) } : { name: '_', values: [''] },
+                      opt2Name.trim() && opt2Values.trim() ? { name: opt2Name.trim(), values: opt2Values.split(',').map((s) => s.trim()).filter(Boolean) } : { name: '__', values: [''] },
+                    ].filter((o) => o.name !== '_' && o.name !== '__')).length || 1} SKU(s) from base {productSku || '…'}
+                  </p>
+                )}
               </div>
               <Button type="submit" className="w-full">Create product</Button>
             </FormPanel>
           </form>
 
-          <form onSubmit={onCreatePo}>
-            <FormPanel title="Create purchase order">
-              <Field label="Vendor">
-                <Select value={poVendor || defaultVendor} onChange={(e) => setPoVendor(e.target.value)}>
-                  {state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
-              </Field>
-              <Field label="Product / variant">
-                <Select value={poVariant || defaultVariant} onChange={(e) => setPoVariant(e.target.value)}>
-                  {state.products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
-                </Select>
-              </Field>
+          <form onSubmit={onCreatePo} className="lg:col-span-2">
+            <FormPanel title="Create purchase order (header + lines)">
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Qty">
-                  <Input type="number" value={poQty} onChange={(e) => setPoQty(e.target.value)} min={1} required />
+                <Field label="Vendor">
+                  <Select value={poVendor || defaultVendor} onChange={(e) => setPoVendor(e.target.value)}>
+                    {state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </Select>
                 </Field>
-                <Field label="Unit cost">
-                  <Input type="number" step="0.01" value={poCost} onChange={(e) => setPoCost(e.target.value)} placeholder="auto" />
+                <Field label="PO number">
+                  <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="PO-1042" />
                 </Field>
+              </div>
+              <div className="space-y-2">
+                {poLines.map((line, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_72px_88px_auto] gap-2 items-end">
+                    <Field label={i === 0 ? 'Line — variant' : ''}>
+                      <Select value={line.productId || defaultVariant} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, productId: e.target.value } : r))}>
+                        {state.products.map((p) => <option key={p.id} value={p.id}>{p.sku}</option>)}
+                      </Select>
+                    </Field>
+                    <Field label={i === 0 ? 'Qty' : ''}>
+                      <Input type="number" value={line.qty} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, qty: e.target.value } : r))} min={1} />
+                    </Field>
+                    <Field label={i === 0 ? 'Unit cost' : ''}>
+                      <Input type="number" step="0.01" value={line.unitCost} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, unitCost: e.target.value } : r))} placeholder="auto" />
+                    </Field>
+                    {poLines.length > 1 && (
+                      <Button type="button" variant="ghost" onClick={() => setPoLines((rows) => rows.filter((_, j) => j !== i))}>×</Button>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="ghost" onClick={() => setPoLines((rows) => [...rows, { productId: defaultVariant, qty: '10', unitCost: '' }])}>+ line</Button>
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600">
                 <input type="checkbox" checked={poSend} onChange={(e) => setPoSend(e.target.checked)} />
@@ -311,7 +381,7 @@ export function Inventory() {
           ) : state.purchaseOrders.map((po) => (
             <Card key={po.id} className="p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm font-semibold">{po.id.slice(0, 8)}…</span>
+                <span className="font-mono text-sm font-semibold">{po.poNumber ?? po.id.slice(0, 8) + '…'}</span>
                 <Badge tone={PO_STATUS_TONE[po.status]}>{po.status.replace(/_/g, ' ')}</Badge>
                 <Badge tone={po.source === 'manual' ? 'slate' : 'indigo'}>
                   {po.source === 'ai_capture' ? '✦ from AI capture' : po.source === 'ai_reorder' ? '✦ AI reorder suggestion' : 'manual'}
@@ -322,12 +392,20 @@ export function Inventory() {
                 {po.lines.map((l) => {
                   const p = productById(l.productId)
                   return (
-                    <div key={l.productId} className="flex justify-between border-t border-slate-50 py-1 first:border-0">
-                      <span>{l.qty}× {p?.name ?? l.productId.slice(0, 8)}</span>
-                      <span className="text-slate-400">${(l.qty * l.unitCost).toFixed(2)}</span>
+                    <div key={l.id ?? l.productId} className="flex justify-between border-t border-slate-50 py-1 first:border-0">
+                      <span>
+                        {l.qty}× {p?.name ?? l.productId.slice(0, 8)}
+                        {l.receivedQty != null && <span className="text-slate-400"> · received {l.receivedQty}/{l.qty}</span>}
+                      </span>
+                      <span className="text-slate-400">${(l.lineTotal ?? l.qty * l.unitCost).toFixed(2)}</span>
                     </div>
                   )
                 })}
+                {po.linkedBills && po.linkedBills.length > 0 && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Linked bills: {po.linkedBills.map((b) => b.billNumber ?? b.id.slice(0, 8)).join(', ')}
+                  </div>
+                )}
               </div>
             </Card>
           ))}
