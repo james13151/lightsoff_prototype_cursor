@@ -1,0 +1,137 @@
+.app {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+.app__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.app__title {
+  margin: 0;
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(120deg, #ffd166, #f5b942 40%, #f78c6b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.app__subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+}
+
+.stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stats__item {
+  display: flex;
+  flex-direction: column;
+  min-width: 5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.stats__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.3s ease;
+}
+
+.board--solved {
+  box-shadow: 0 0 40px rgba(255, 209, 102, 0.55);
+}
+
+.board__row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.cell {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cell:active {
+  transform: scale(0.94);
+}
+
+.cell--off {
+  background: #222746;
+}
+
+.cell--on {
+  background: linear-gradient(145deg, #ffd166, #f78c6b);
+  box-shadow:
+    0 0 18px rgba(255, 209, 102, 0.65),
+    inset 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+.win {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffd166;
+}
+
+.new-game {
+  padding: 0.7rem 1.6rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f1226;
+  background: linear-gradient(120deg, #ffd166, #f78c6b);
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    filter 0.15s ease;
+}
+
+.new-game:hover {
+  filter: brightness(1.05);
+}
+
+.new-game:active {
+  transform: translateY(1px);
+}
