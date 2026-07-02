@@ -1,0 +1,28 @@
+{
+  "name": "lightsoff-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LightsOff Phase 0 API — tenant-scoped access to the foundation schema with RLS enforced end-to-end",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "dev-token": "node scripts/dev-token.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "fastify": "^5.9.0",
+    "jose": "^6.2.3",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
