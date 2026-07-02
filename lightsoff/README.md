@@ -1,6 +1,6 @@
-# Brand OS — Prototype
+# LightsOff — Prototype
 
-An interactive prototype of **Brand OS**, the AI-driven brand operating system for solo Shopify operators described in the product roadmap. One AI operator sits across inventory, money, marketing, customer conversations, R&D, and internal coordination — surfacing only what needs a human decision today.
+An interactive prototype of **LightsOff**, the AI-driven brand operating system for solo Shopify operators described in the product roadmap. One AI operator sits across inventory, money, marketing, customer conversations, R&D, and internal coordination — surfacing only what needs a human decision today.
 
 ## Run it
 

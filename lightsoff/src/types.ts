@@ -1,4 +1,4 @@
-// Entity model based on Brand OS spec Section 7 (simplified for prototype)
+// Entity model based on the product spec Section 7 (simplified for prototype)
 
 export type Confidence = number // 0..1
 
