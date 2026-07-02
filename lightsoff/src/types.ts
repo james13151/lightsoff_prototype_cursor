@@ -59,7 +59,7 @@ export interface InventoryLedgerEntry {
   at: string
 }
 
-export type BillStatus = 'unpaid' | 'scheduled' | 'paid'
+export type BillStatus = 'unpaid' | 'partially_paid' | 'scheduled' | 'paid'
 
 export interface VendorBill {
   id: string
@@ -69,6 +69,7 @@ export interface VendorBill {
   status: BillStatus
   memo: string
   anomaly: string | null
+  amountPaid?: number
 }
 
 export interface JournalLine {

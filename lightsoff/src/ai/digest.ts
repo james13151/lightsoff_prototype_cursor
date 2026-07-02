@@ -93,7 +93,7 @@ export function buildDigest(state: AppState): DigestItem[] {
 
   // Bills due within 7 days
   for (const b of state.bills) {
-    if (b.status !== 'unpaid' || b.anomaly) continue
+    if ((b.status !== 'unpaid' && b.status !== 'partially_paid') || b.anomaly) continue
     const days = Math.ceil((new Date(b.dueDate).getTime() - Date.now()) / 86400000)
     if (days <= 7) {
       items.push({
@@ -196,7 +196,15 @@ export function buildDigest(state: AppState): DigestItem[] {
 }
 
 export function cashPosition(state: AppState): { cash: number; revenue30d: number; expenses30d: number } {
-  let cash = 12000 // opening balance for prototype
+  if (state.financeSummary) {
+    const f = state.financeSummary
+    return {
+      cash: Number(f.cash),
+      revenue30d: Number(f.revenue),
+      expenses30d: Number(f.expenses),
+    }
+  }
+  let cash = 12000 // demo opening balance
   let revenue = 0
   let expenses = 0
   for (const je of state.journal) {
