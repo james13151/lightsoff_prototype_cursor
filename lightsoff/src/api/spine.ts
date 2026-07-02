@@ -1,6 +1,6 @@
 import { apiFetch } from './client'
 import type {
-  Product, ProductMaster, Vendor, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
+  Product, ProductMaster, Vendor, Warehouse, StockByWarehouse, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
   JournalEntry, ExpenseClaim, BusEvent, CaptureDraft, VendorPayment,
 } from '../types'
 
@@ -15,6 +15,8 @@ export interface FinanceSummary {
 
 export interface SpineSnapshot {
   vendors: Vendor[]
+  warehouses: Warehouse[]
+  stockByWarehouse: StockByWarehouse[]
   products: Product[]
   productMasters: ProductMaster[]
   purchaseOrders: PurchaseOrder[]
@@ -66,6 +68,8 @@ type Row = Record<string, any>
 
 export function adaptSpineData(raw: {
   vendors: Row[]
+  warehouses: Row[]
+  stockByWarehouse: Row[]
   products: Row[]
   stock: Row[]
   purchaseOrders: Row[]
@@ -79,6 +83,25 @@ export function adaptSpineData(raw: {
   financeSummary: FinanceSummary
 }): SpineSnapshot {
   const stockByVariant = new Map<string, number>(raw.stock.map((s) => [s.variant_id, Number(s.on_hand)]))
+
+  const warehouses: Warehouse[] = raw.warehouses.map((w) => ({
+    id: w.id,
+    code: w.code,
+    name: w.name,
+    isDefault: Boolean(w.is_default),
+    address: w.address ?? {},
+  }))
+
+  const stockByWarehouse: StockByWarehouse[] = raw.stockByWarehouse.map((s) => ({
+    warehouseId: s.warehouse_id,
+    warehouseCode: s.warehouse_code,
+    warehouseName: s.warehouse_name,
+    isDefault: Boolean(s.is_default),
+    variantId: s.variant_id,
+    sku: s.sku,
+    onHand: Number(s.on_hand),
+    reorderPoint: Number(s.reorder_point ?? 0),
+  }))
 
   const productMasters: ProductMaster[] = raw.products.map((p) => ({
     id: p.id,
@@ -144,6 +167,9 @@ export function adaptSpineData(raw: {
     poId: r.po_id,
     vendorId: r.vendor_id,
     type: r.type,
+    warehouseId: r.warehouse_id ?? undefined,
+    warehouseCode: r.warehouse_code ?? undefined,
+    warehouseName: r.warehouse_name ?? undefined,
     createdAt: r.received_at ?? r.created_at,
     linkedBills: r.bills ?? [],
     lines: (r.lines ?? []).map((l: Row) => ({
@@ -163,6 +189,9 @@ export function adaptSpineData(raw: {
     reason: e.reason,
     refId: e.ref_id ?? '',
     at: e.created_at,
+    warehouseId: e.warehouse_id ?? undefined,
+    warehouseCode: e.warehouse_code ?? undefined,
+    location: e.location ?? undefined,
   }))
 
   const bills: VendorBill[] = raw.bills.map((b) => ({
@@ -245,7 +274,7 @@ export function adaptSpineData(raw: {
   }))
 
   return {
-    vendors, products, productMasters, purchaseOrders, receipts, ledger, bills, payments, journal, claims, events,
+    vendors, warehouses, stockByWarehouse, products, productMasters, purchaseOrders, receipts, ledger, bills, payments, journal, claims, events,
     financeSummary: raw.financeSummary,
   }
 }
@@ -253,9 +282,11 @@ export function adaptSpineData(raw: {
 export async function fetchSpineSnapshot(token: string, tenantId: string): Promise<SpineSnapshot> {
   const q = (path: string) => apiFetch<Row[] | Row>(`${path}?tenant_id=${tenantId}`, { token })
 
-  const [vendors, products, stock, purchaseOrders, receipts, ledger, bills, payments, journal, claims, events, financeSummary] =
+  const [vendors, warehouses, stockByWarehouse, products, stock, purchaseOrders, receipts, ledger, bills, payments, journal, claims, events, financeSummary] =
     await Promise.all([
       q('/v1/vendors'),
+      q('/v1/warehouses'),
+      q('/v1/stock-by-warehouse'),
       q('/v1/products'),
       q('/v1/stock'),
       q('/v1/purchase-orders'),
@@ -271,6 +302,8 @@ export async function fetchSpineSnapshot(token: string, tenantId: string): Promi
 
   return adaptSpineData({
     vendors: vendors as Row[],
+    warehouses: warehouses as Row[],
+    stockByWarehouse: stockByWarehouse as Row[],
     products: products as Row[],
     stock: stock as Row[],
     purchaseOrders: purchaseOrders as Row[],

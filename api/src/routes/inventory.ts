@@ -209,23 +209,66 @@ export function inventoryRoutes(app: FastifyInstance) {
     return updated
   })
 
+  // ---- Warehouses / locations ----
+
+  app.get<{ Querystring: { tenant_id?: string } }>('/v1/warehouses', async (req, reply) => {
+    const { tenant_id } = req.query
+    if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
+    return withUser(req.userId, async (db) => {
+      const r = await db.query(
+        `select * from app.warehouses where tenant_id = $1 order by is_default desc, code`,
+        [tenant_id],
+      )
+      return r.rows
+    })
+  })
+
+  app.post<{
+    Body: { tenant_id: string; code: string; name: string; is_default?: boolean; address?: Record<string, unknown> }
+  }>('/v1/warehouses', async (req, reply) => {
+    const { tenant_id, code, name, is_default, address } = req.body ?? {}
+    if (!tenant_id || !code?.trim() || !name?.trim()) {
+      return reply.code(400).send({ error: 'tenant_id, code and name are required' })
+    }
+    try {
+      const warehouse = await withUser(req.userId, async (db) => {
+        if (is_default) {
+          await db.query(
+            `update app.warehouses set is_default = false where tenant_id = $1`,
+            [tenant_id],
+          )
+        }
+        const r = await db.query(
+          `insert into app.warehouses (tenant_id, code, name, is_default, address)
+           values ($1, $2, $3, coalesce($4, false), coalesce($5, '{}'::jsonb)) returning *`,
+          [tenant_id, code.trim().toUpperCase(), name.trim(), is_default ?? false, JSON.stringify(address ?? {})],
+        )
+        return r.rows[0]
+      })
+      return reply.code(201).send(warehouse)
+    } catch (err) {
+      if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
+      throw err
+    }
+  })
+
   // ---- Receipts ----
   // Creates the receipt + lines and finalizes atomically: ledger entries are
   // written, PO status rolls forward, discrepancies are flagged on the bus.
 
   app.post<{
-    Body: { tenant_id: string; vendor_id: string; po_id?: string; type?: 'commercial' | 'sample'; lines: ReceiptLineInput[]; notes?: string }
+    Body: { tenant_id: string; vendor_id: string; po_id?: string; warehouse_id?: string; type?: 'commercial' | 'sample'; lines: ReceiptLineInput[]; notes?: string }
   }>('/v1/receipts', async (req, reply) => {
-    const { tenant_id, vendor_id, po_id, type, lines, notes } = req.body ?? {}
+    const { tenant_id, vendor_id, po_id, warehouse_id, type, lines, notes } = req.body ?? {}
     if (!tenant_id || !vendor_id || !Array.isArray(lines) || lines.length === 0) {
       return reply.code(400).send({ error: 'tenant_id, vendor_id and at least one line are required' })
     }
     try {
       const result = await withUser(req.userId, async (db) => {
         const r = await db.query(
-          `insert into app.receipts (tenant_id, po_id, vendor_id, type, notes, created_by)
-           values ($1, $2, $3, coalesce($4, 'commercial')::app.receipt_type, $5, $6) returning *`,
-          [tenant_id, po_id ?? null, vendor_id, type ?? null, notes ?? null, req.userId],
+          `insert into app.receipts (tenant_id, po_id, vendor_id, warehouse_id, type, notes, created_by)
+           values ($1, $2, $3, $4, coalesce($5, 'commercial')::app.receipt_type, $6, $7) returning *`,
+          [tenant_id, po_id ?? null, vendor_id, warehouse_id ?? null, type ?? null, notes ?? null, req.userId],
         )
         const receipt = r.rows[0]
         for (const line of lines) {
@@ -256,7 +299,7 @@ export function inventoryRoutes(app: FastifyInstance) {
     if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
     return withUser(req.userId, async (db) => {
       const r = await db.query(
-        `select rc.*, v.name as vendor_name,
+        `select rc.*, v.name as vendor_name, w.code as warehouse_code, w.name as warehouse_name,
                 coalesce(jsonb_agg(jsonb_build_object(
                   'id', l.id, 'variant_id', l.variant_id, 'description', l.description, 'qty', l.qty,
                   'po_line_item_id', l.po_line_item_id
@@ -267,9 +310,10 @@ export function inventoryRoutes(app: FastifyInstance) {
                 ), '[]') as bills
            from app.receipts rc
            join app.vendors v on v.id = rc.vendor_id
+           left join app.warehouses w on w.id = rc.warehouse_id
            left join app.receipt_line_items l on l.receipt_id = rc.id
           where rc.tenant_id = $1
-          group by rc.id, v.name
+          group by rc.id, v.name, w.code, w.name
           order by rc.created_at desc`,
         [tenant_id],
       )
@@ -279,10 +323,20 @@ export function inventoryRoutes(app: FastifyInstance) {
 
   // ---- Stock + ledger (drill-down views) ----
 
-  app.get<{ Querystring: { tenant_id?: string } }>('/v1/stock', async (req, reply) => {
-    const { tenant_id } = req.query
+  app.get<{ Querystring: { tenant_id?: string; warehouse_id?: string } }>('/v1/stock', async (req, reply) => {
+    const { tenant_id, warehouse_id } = req.query
     if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
     return withUser(req.userId, async (db) => {
+      if (warehouse_id) {
+        const r = await db.query(
+          `select s.*, (s.on_hand <= coalesce(s.reorder_point, 0)) as below_reorder_point
+             from app.stock_by_warehouse s
+            where s.tenant_id = $1 and s.warehouse_id = $2
+            order by s.sku`,
+          [tenant_id, warehouse_id],
+        )
+        return r.rows
+      }
       const r = await db.query(
         `select s.*, (s.on_hand <= coalesce(s.reorder_point, 0)) as below_reorder_point
            from app.current_stock s where s.tenant_id = $1 order by s.sku`,
@@ -292,22 +346,47 @@ export function inventoryRoutes(app: FastifyInstance) {
     })
   })
 
+  app.get<{ Querystring: { tenant_id?: string; warehouse_id?: string } }>('/v1/stock-by-warehouse', async (req, reply) => {
+    const { tenant_id, warehouse_id } = req.query
+    if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
+    return withUser(req.userId, async (db) => {
+      const r = await db.query(
+        `select * from app.stock_by_warehouse
+          where tenant_id = $1 and ($2::uuid is null or warehouse_id = $2)
+          order by warehouse_code, sku`,
+        [tenant_id, warehouse_id ?? null],
+      )
+      return r.rows
+    })
+  })
+
   // Manual stock correction — writes an append-only ledger entry (spec §4.1 fallback path).
   app.post<{
-    Body: { tenant_id: string; variant_id: string; qty_delta: number; memo?: string }
+    Body: { tenant_id: string; variant_id: string; qty_delta: number; warehouse_id?: string; memo?: string }
   }>('/v1/inventory-adjustments', async (req, reply) => {
-    const { tenant_id, variant_id, qty_delta, memo } = req.body ?? {}
+    const { tenant_id, variant_id, qty_delta, warehouse_id, memo } = req.body ?? {}
     if (!tenant_id || !variant_id || qty_delta === undefined || qty_delta === 0) {
       return reply.code(400).send({ error: 'tenant_id, variant_id and non-zero qty_delta are required' })
     }
     try {
       const entry = await withUser(req.userId, async (db) => {
+        const wh = await db.query(
+          `select coalesce(
+             (select id from app.warehouses where id = $3 and tenant_id = $1),
+             app.default_warehouse_id($1)
+           ) as id,
+           (select code from app.warehouses where id = coalesce($3, app.default_warehouse_id($1))) as code`,
+          [tenant_id, variant_id, warehouse_id ?? null],
+        )
+        const whId = wh.rows[0]?.id as string | null
+        const whCode = wh.rows[0]?.code as string | null
+        if (!whId) throw Object.assign(new Error('no warehouse for tenant'), { code: 'WH01' })
         const r = await db.query(
           `insert into app.inventory_ledger_entries
-             (tenant_id, variant_id, qty_delta, reason, ref_type, ref_id)
-           values ($1, $2, $3, 'manual_adjustment', 'adjustment', gen_random_uuid())
+             (tenant_id, variant_id, qty_delta, reason, ref_type, ref_id, warehouse_id, location)
+           values ($1, $2, $3, 'manual_adjustment', 'adjustment', gen_random_uuid(), $4, $5)
            returning *`,
-          [tenant_id, variant_id, qty_delta],
+          [tenant_id, variant_id, qty_delta, whId, whCode],
         )
         const created = r.rows[0]
         await db.query('select app.emit_event($1, $2, $3)', [
@@ -329,16 +408,20 @@ export function inventoryRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get<{ Querystring: { tenant_id?: string; variant_id?: string } }>('/v1/inventory-ledger', async (req, reply) => {
-    const { tenant_id, variant_id } = req.query
+  app.get<{ Querystring: { tenant_id?: string; variant_id?: string; warehouse_id?: string } }>('/v1/inventory-ledger', async (req, reply) => {
+    const { tenant_id, variant_id, warehouse_id } = req.query
     if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
     return withUser(req.userId, async (db) => {
       const r = await db.query(
-        `select ile.*, v.sku from app.inventory_ledger_entries ile
+        `select ile.*, v.sku, w.code as warehouse_code, w.name as warehouse_name
+           from app.inventory_ledger_entries ile
            join app.variants v on v.id = ile.variant_id
-          where ile.tenant_id = $1 and ($2::uuid is null or ile.variant_id = $2)
+           left join app.warehouses w on w.id = ile.warehouse_id
+          where ile.tenant_id = $1
+            and ($2::uuid is null or ile.variant_id = $2)
+            and ($3::uuid is null or ile.warehouse_id = $3)
           order by ile.created_at desc limit 500`,
-        [tenant_id, variant_id ?? null],
+        [tenant_id, variant_id ?? null, warehouse_id ?? null],
       )
       return r.rows
     })

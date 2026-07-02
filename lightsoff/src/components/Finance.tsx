@@ -6,7 +6,7 @@ import {
   fetchAccounts, recordPayment, type AccountOption,
 } from '../api/mutations'
 import {
-  Badge, Button, Card, ConfidenceBadge, Field, FormPanel, Input, SectionTitle, Select, Stat, timeAgo,
+  Badge, Button, Card, ConfidenceBadge, Field, FormPanel, Input, SectionTitle, Select, Stat, SubTabs, timeAgo,
 } from './ui'
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -36,8 +36,19 @@ interface JournalLineDraft {
   credit: string
 }
 
+type FinTab = 'overview' | 'bills' | 'payments' | 'claims' | 'journal'
+
+const FIN_TABS: { id: FinTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'bills', label: 'Bills' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'claims', label: 'Claims' },
+  { id: 'journal', label: 'Journal' },
+]
+
 export function Finance() {
   const { state, dispatch, spineMutate, auth, mode } = useStore()
+  const [tab, setTab] = useState<FinTab>('overview')
   const { cash, revenue30d, expenses30d } = cashPosition(state)
   const vendorName = (id: string) => state.vendors.find((v) => v.id === id)?.name ?? '—'
   const unpaidTotal = state.bills
@@ -206,25 +217,30 @@ export function Finance() {
   const jeBalanced = Math.abs(jeDebit - jeCredit) < 0.001 && jeDebit > 0
 
   return (
-    <div className="space-y-8">
-      <div>
-        <SectionTitle sub="Computed live from the journal — no separate reporting layer, no shadow ledgers in other modules.">
-          Cash & P&L
-        </SectionTitle>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Cash" value={`$${cash.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} tone="text-emerald-600" />
-          <Stat label="Revenue (30d)" value={`$${revenue30d.toLocaleString()}`} />
-          <Stat label="Expenses (30d)" value={`$${expenses30d.toLocaleString()}`} />
-          <Stat label="AP outstanding" value={`$${unpaidTotal.toLocaleString()}`} sub={`${openBills.length} open bills`} tone="text-amber-600" />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <SectionTitle sub="Finance spine — bills, payments, claims, and journal entries flow from inventory events.">
+        Finance
+      </SectionTitle>
 
-      <div>
-        <SectionTitle sub="Record bills, payments, expense claims, and manual journal entries.">
-          Quick actions
-        </SectionTitle>
-        <div className="grid gap-3 lg:grid-cols-2">
-          <form onSubmit={onCreateBill} className="lg:col-span-2">
+      <SubTabs tabs={FIN_TABS} active={tab} onChange={setTab} />
+
+      {tab === 'overview' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Cash" value={`$${cash.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} tone="text-emerald-600" />
+            <Stat label="Revenue (30d)" value={`$${revenue30d.toLocaleString()}`} />
+            <Stat label="Expenses (30d)" value={`$${expenses30d.toLocaleString()}`} />
+            <Stat label="AP outstanding" value={`$${unpaidTotal.toLocaleString()}`} sub={`${openBills.length} open bills`} tone="text-amber-600" />
+          </div>
+          <p className="text-sm text-slate-500">
+            Use the tabs above to record bills, payments, expense claims, or manual journal entries — each type has its own form and history.
+          </p>
+        </div>
+      )}
+
+      {tab === 'bills' && (
+        <div className="space-y-4">
+          <form onSubmit={onCreateBill}>
             <FormPanel title="Add vendor bill (header + lines)">
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Vendor">
@@ -278,7 +294,61 @@ export function Finance() {
             </FormPanel>
           </form>
 
-          <form onSubmit={onRecordPayment} className="lg:col-span-2">
+          <div className="space-y-2.5">
+            {state.bills.length === 0 ? (
+              <Card className="p-4 text-sm text-slate-400">No bills yet.</Card>
+            ) : state.bills.map((b) => {
+              const days = Math.ceil((new Date(b.dueDate).getTime() - Date.now()) / 86400000)
+              return (
+                <Card key={b.id} className="p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-sm font-semibold">{b.billNumber ?? b.id.slice(0, 8) + '…'}</span>
+                    {b.poNumber && <Badge tone="sky">PO {b.poNumber}</Badge>}
+                    <Badge tone={b.status === 'paid' ? 'emerald' : b.status === 'partially_paid' ? 'sky' : days <= 3 ? 'rose' : 'amber'}>
+                      {b.status === 'paid' ? 'paid' : b.status === 'partially_paid' ? `partially paid ($${(b.amountPaid ?? 0).toFixed(0)}/${b.amount.toFixed(0)})` : `due ${days >= 0 ? `in ${days}d` : `${-days}d ago`}`}
+                    </Badge>
+                    <span className="text-sm text-slate-600">{vendorName(b.vendorId)} — {b.memo}</span>
+                    <span className="ml-auto text-sm font-semibold">${b.amount.toFixed(2)}</span>
+                    {b.status !== 'paid' && !b.anomaly && (
+                      <Button variant="secondary" onClick={() => dispatch({ type: 'PAY_BILL', billId: b.id })}>Pay</Button>
+                    )}
+                  </div>
+                  {b.lines && b.lines.length > 0 && (
+                    <table className="mt-2 w-full text-xs text-slate-600">
+                      <tbody>
+                        {b.lines.map((l) => (
+                          <tr key={l.id ?? l.lineNumber} className="border-t border-slate-50">
+                            <td className="py-1">{l.description ?? 'Line'}</td>
+                            <td className="py-1 text-right">{l.qty} × ${l.unitCost.toFixed(2)}</td>
+                            <td className="py-1 text-right font-medium">${l.lineAmount.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {b.payments && b.payments.length > 0 && (
+                    <div className="mt-1 text-xs text-slate-500">
+                      Payments: {b.payments.map((p) => `$${p.amount.toFixed(2)}`).join(', ')}
+                    </div>
+                  )}
+                  {b.anomaly && (
+                    <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2">
+                      <span className="text-sm text-rose-700">⚠ {b.anomaly}</span>
+                      <Button variant="secondary" onClick={() => dispatch({ type: 'APPROVE_BILL_ANOMALY', billId: b.id })}>
+                        Reviewed — approve
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab === 'payments' && (
+        <div className="space-y-4">
+          <form onSubmit={onRecordPayment}>
             <FormPanel title="Record payment (multi-bill allocations)">
               <Field label="Vendor">
                 <Select value={payVendor || defaultVendor} onChange={(e) => setPayVendor(e.target.value)}>
@@ -319,7 +389,30 @@ export function Finance() {
             </FormPanel>
           </form>
 
-          <form onSubmit={onCreateClaim}>
+          <div className="space-y-2.5">
+            {state.payments.length === 0 ? (
+              <Card className="p-4 text-sm text-slate-400">No payments recorded yet.</Card>
+            ) : state.payments.map((p) => (
+              <Card key={p.id} className="p-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono font-semibold">{p.id.slice(0, 8)}…</span>
+                  <Badge tone="slate">{p.method}</Badge>
+                  <span>{vendorName(p.vendorId)}</span>
+                  <span className="ml-auto font-semibold">${p.amount.toFixed(2)}</span>
+                  <span className="text-xs text-slate-400">{timeAgo(p.paidAt)}</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {p.allocations.map((a) => `${a.billNumber ?? a.billId.slice(0, 8)}: $${a.amount.toFixed(2)}`).join(' · ')}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'claims' && (
+        <div className="space-y-4">
+          <form onSubmit={onCreateClaim} className="max-w-md">
             <FormPanel title="Expense claim">
               <Field label="Vendor / payee">
                 <Input value={claimVendor} onChange={(e) => setClaimVendor(e.target.value)} placeholder="FedEx" required />
@@ -342,6 +435,32 @@ export function Finance() {
             </FormPanel>
           </form>
 
+          <div className="space-y-2.5">
+            {state.claims.length === 0 ? (
+              <Card className="p-4 text-sm text-slate-400">No expense claims yet.</Card>
+            ) : state.claims.map((c) => (
+              <Card key={c.id} className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm font-semibold">{c.id.slice(0, 8)}…</span>
+                  <Badge tone={c.status === 'approved' ? 'emerald' : c.status === 'rejected' ? 'rose' : 'amber'}>{c.status.replace(/_/g, ' ')}</Badge>
+                  <span className="text-sm text-slate-600">{c.vendorName} → {c.category}</span>
+                  <ConfidenceBadge value={c.confidence} />
+                  <span className="ml-auto text-sm font-semibold">${c.amount.toFixed(2)}</span>
+                  {c.status === 'pending_review' && (
+                    <>
+                      <Button variant="secondary" onClick={() => dispatch({ type: 'APPROVE_CLAIM', claimId: c.id })}>Approve</Button>
+                      <Button variant="ghost" onClick={() => dispatch({ type: 'REJECT_CLAIM', claimId: c.id })}>Reject</Button>
+                    </>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'journal' && (
+        <div className="space-y-4">
           <form onSubmit={onCreateJournal}>
             <FormPanel title="Journal entry">
               <Field label="Memo">
@@ -381,146 +500,35 @@ export function Finance() {
               <Button type="submit" className="w-full" disabled={!jeBalanced}>Post journal entry</Button>
             </FormPanel>
           </form>
-        </div>
-      </div>
 
-      <div>
-        <SectionTitle sub="Auto-created from Inventory's PO/receipt flow. Anomalies (new vendor, unusual amount) are held — recurring vendors auto-post.">
-          Vendor bills
-        </SectionTitle>
-        <div className="space-y-2.5">
-          {state.bills.length === 0 ? (
-            <Card className="p-4 text-sm text-slate-400">No bills yet.</Card>
-          ) : state.bills.map((b) => {
-            const days = Math.ceil((new Date(b.dueDate).getTime() - Date.now()) / 86400000)
-            return (
-              <Card key={b.id} className="p-4">
+          <div className="space-y-2.5">
+            {state.journal.length === 0 ? (
+              <Card className="p-4 text-sm text-slate-400">No journal entries yet.</Card>
+            ) : state.journal.map((je) => (
+              <Card key={je.id} className="p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold">{b.billNumber ?? b.id.slice(0, 8) + '…'}</span>
-                  {b.poNumber && <Badge tone="sky">PO {b.poNumber}</Badge>}
-                  <Badge tone={b.status === 'paid' ? 'emerald' : b.status === 'partially_paid' ? 'sky' : days <= 3 ? 'rose' : 'amber'}>
-                    {b.status === 'paid' ? 'paid' : b.status === 'partially_paid' ? `partially paid ($${(b.amountPaid ?? 0).toFixed(0)}/${b.amount.toFixed(0)})` : `due ${days >= 0 ? `in ${days}d` : `${-days}d ago`}`}
-                  </Badge>
-                  <span className="text-sm text-slate-600">{vendorName(b.vendorId)} — {b.memo}</span>
-                  <span className="ml-auto text-sm font-semibold">${b.amount.toFixed(2)}</span>
-                  {b.status !== 'paid' && !b.anomaly && (
-                    <Button variant="secondary" onClick={() => dispatch({ type: 'PAY_BILL', billId: b.id })}>Pay</Button>
-                  )}
+                  <span className="font-mono text-sm font-semibold">{je.id.slice(0, 8)}…</span>
+                  <Badge tone="slate">{SOURCE_LABEL[je.source]}</Badge>
+                  {je.autoPosted && <Badge tone="indigo">✦ auto-posted</Badge>}
+                  <span className="text-sm text-slate-600">{je.memo}</span>
+                  <span className="ml-auto text-xs text-slate-400">{timeAgo(je.at)}</span>
                 </div>
-                {b.lines && b.lines.length > 0 && (
-                  <table className="mt-2 w-full text-xs text-slate-600">
-                    <tbody>
-                      {b.lines.map((l) => (
-                        <tr key={l.id ?? l.lineNumber} className="border-t border-slate-50">
-                          <td className="py-1">{l.description ?? 'Line'}</td>
-                          <td className="py-1 text-right">{l.qty} × ${l.unitCost.toFixed(2)}</td>
-                          <td className="py-1 text-right font-medium">${l.lineAmount.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                {b.payments && b.payments.length > 0 && (
-                  <div className="mt-1 text-xs text-slate-500">
-                    Payments: {b.payments.map((p) => `$${p.amount.toFixed(2)}`).join(', ')}
-                  </div>
-                )}
-                {b.anomaly && (
-                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2">
-                    <span className="text-sm text-rose-700">⚠ {b.anomaly}</span>
-                    <Button variant="secondary" onClick={() => dispatch({ type: 'APPROVE_BILL_ANOMALY', billId: b.id })}>
-                      Reviewed — approve
-                    </Button>
-                  </div>
-                )}
+                <table className="mt-2 w-full text-sm">
+                  <tbody>
+                    {je.lines.map((l, i) => (
+                      <tr key={i} className="border-t border-slate-50">
+                        <td className="py-1 text-slate-600">{l.account}</td>
+                        <td className="py-1 text-right font-mono text-xs text-slate-500">{l.debit > 0 ? `$${l.debit.toFixed(2)}` : ''}</td>
+                        <td className="py-1 text-right font-mono text-xs text-slate-400">{l.credit > 0 ? `$${l.credit.toFixed(2)}` : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </Card>
-            )
-          })}
+            ))}
+          </div>
         </div>
-      </div>
-
-      <div>
-        <SectionTitle sub="Payments allocate to one or more bills — partial amounts supported.">
-          Payment history
-        </SectionTitle>
-        <div className="space-y-2.5">
-          {state.payments.length === 0 ? (
-            <Card className="p-4 text-sm text-slate-400">No payments recorded yet.</Card>
-          ) : state.payments.map((p) => (
-            <Card key={p.id} className="p-4 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono font-semibold">{p.id.slice(0, 8)}…</span>
-                <Badge tone="slate">{p.method}</Badge>
-                <span>{vendorName(p.vendorId)}</span>
-                <span className="ml-auto font-semibold">${p.amount.toFixed(2)}</span>
-                <span className="text-xs text-slate-400">{timeAgo(p.paidAt)}</span>
-              </div>
-              <div className="mt-1 text-xs text-slate-500">
-                {p.allocations.map((a) => `${a.billNumber ?? a.billId.slice(0, 8)}: $${a.amount.toFixed(2)}`).join(' · ')}
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionTitle sub="AI extracts vendor, amount, and category from receipt photos. Above your confidence threshold they auto-apply with an undo window; below it they route to a Collab approval ticket.">
-          Expense claims (petty cash)
-        </SectionTitle>
-        <div className="space-y-2.5">
-          {state.claims.length === 0 ? (
-            <Card className="p-4 text-sm text-slate-400">No expense claims yet.</Card>
-          ) : state.claims.map((c) => (
-            <Card key={c.id} className="p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm font-semibold">{c.id.slice(0, 8)}…</span>
-                <Badge tone={c.status === 'approved' ? 'emerald' : c.status === 'rejected' ? 'rose' : 'amber'}>{c.status.replace(/_/g, ' ')}</Badge>
-                <span className="text-sm text-slate-600">{c.vendorName} → {c.category}</span>
-                <ConfidenceBadge value={c.confidence} />
-                <span className="ml-auto text-sm font-semibold">${c.amount.toFixed(2)}</span>
-                {c.status === 'pending_review' && (
-                  <>
-                    <Button variant="secondary" onClick={() => dispatch({ type: 'APPROVE_CLAIM', claimId: c.id })}>Approve</Button>
-                    <Button variant="ghost" onClick={() => dispatch({ type: 'REJECT_CLAIM', claimId: c.id })}>Reject</Button>
-                  </>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionTitle sub="Double-entry, auto-posted from other modules' events. This is the single ledger every cost and revenue event flows into.">
-          Journal
-        </SectionTitle>
-        <div className="space-y-2.5">
-          {state.journal.length === 0 ? (
-            <Card className="p-4 text-sm text-slate-400">No journal entries yet.</Card>
-          ) : state.journal.map((je) => (
-            <Card key={je.id} className="p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm font-semibold">{je.id.slice(0, 8)}…</span>
-                <Badge tone="slate">{SOURCE_LABEL[je.source]}</Badge>
-                {je.autoPosted && <Badge tone="indigo">✦ auto-posted</Badge>}
-                <span className="text-sm text-slate-600">{je.memo}</span>
-                <span className="ml-auto text-xs text-slate-400">{timeAgo(je.at)}</span>
-              </div>
-              <table className="mt-2 w-full text-sm">
-                <tbody>
-                  {je.lines.map((l, i) => (
-                    <tr key={i} className="border-t border-slate-50">
-                      <td className="py-1 text-slate-600">{l.account}</td>
-                      <td className="py-1 text-right font-mono text-xs text-slate-500">{l.debit > 0 ? `$${l.debit.toFixed(2)}` : ''}</td>
-                      <td className="py-1 text-right font-mono text-xs text-slate-400">{l.credit > 0 ? `$${l.credit.toFixed(2)}` : ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   )
 }

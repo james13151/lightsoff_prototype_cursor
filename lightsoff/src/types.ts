@@ -9,6 +9,25 @@ export interface Vendor {
   isRecurring: boolean
 }
 
+export interface Warehouse {
+  id: string
+  code: string
+  name: string
+  isDefault: boolean
+  address?: Record<string, unknown>
+}
+
+export interface StockByWarehouse {
+  warehouseId: string
+  warehouseCode: string
+  warehouseName: string
+  isDefault: boolean
+  variantId: string
+  sku: string
+  onHand: number
+  reorderPoint: number
+}
+
 export interface Product {
   id: string
   productId?: string
@@ -68,6 +87,9 @@ export interface Receipt {
   poId: string | null
   vendorId: string
   type: ReceiptType
+  warehouseId?: string
+  warehouseCode?: string
+  warehouseName?: string
   lines: { id?: string; productId: string | null; description: string; qty: number; poLineItemId?: string }[]
   discrepancy: string | null
   createdAt: string
@@ -81,6 +103,9 @@ export interface InventoryLedgerEntry {
   reason: 'po_receipt' | 'shopify_sale' | 'manual_adjustment' | 'sample_receipt'
   refId: string
   at: string
+  warehouseId?: string
+  warehouseCode?: string
+  location?: string
 }
 
 export type BillStatus = 'unpaid' | 'partially_paid' | 'scheduled' | 'paid'

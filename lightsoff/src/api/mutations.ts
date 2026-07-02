@@ -130,12 +130,27 @@ export async function createPurchaseOrder(
   return po
 }
 
+export async function createWarehouse(
+  token: string,
+  tenantId: string,
+  data: { code: string; name: string; isDefault?: boolean; address?: Record<string, unknown> },
+) {
+  return post(token, '/v1/warehouses', {
+    tenant_id: tenantId,
+    code: data.code,
+    name: data.name,
+    is_default: data.isDefault,
+    address: data.address,
+  })
+}
+
 export async function createReceipt(
   token: string,
   tenantId: string,
   data: {
     vendorId: string
     poId?: string
+    warehouseId?: string
     type?: 'commercial' | 'sample'
     lines: { variantId?: string; description?: string; qty: number; poLineItemId?: string }[]
     notes?: string
@@ -145,6 +160,7 @@ export async function createReceipt(
     tenant_id: tenantId,
     vendor_id: data.vendorId,
     po_id: data.poId,
+    warehouse_id: data.warehouseId,
     type: data.type ?? 'commercial',
     notes: data.notes,
     lines: data.lines.map((l) => ({
@@ -159,12 +175,13 @@ export async function createReceipt(
 export async function adjustInventory(
   token: string,
   tenantId: string,
-  data: { variantId: string; qtyDelta: number; memo?: string },
+  data: { variantId: string; qtyDelta: number; warehouseId?: string; memo?: string },
 ) {
   return post(token, '/v1/inventory-adjustments', {
     tenant_id: tenantId,
     variant_id: data.variantId,
     qty_delta: data.qtyDelta,
+    warehouse_id: data.warehouseId,
     memo: data.memo,
   })
 }
