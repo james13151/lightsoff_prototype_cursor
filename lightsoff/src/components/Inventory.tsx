@@ -13,7 +13,7 @@ export function Inventory() {
   return (
     <div className="space-y-8">
       <div>
-        <SectionTitle sub="Brand OS is the system of record for stock — every movement below is pushed to Shopify, not pulled from it.">
+        <SectionTitle sub="LightsOff is the system of record for stock — every movement below is pushed to Shopify, not pulled from it.">
           Stock levels
         </SectionTitle>
         <Card>

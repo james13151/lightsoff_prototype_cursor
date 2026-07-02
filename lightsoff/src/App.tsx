@@ -80,9 +80,9 @@ export default function App() {
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 w-60 border-r border-slate-200 bg-white">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">B</div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">L</div>
           <div>
-            <div className="text-sm font-semibold leading-tight">Brand OS</div>
+            <div className="text-sm font-semibold leading-tight">LightsOff</div>
             <div className="text-[11px] text-slate-400">AI operator · prototype</div>
           </div>
         </div>
