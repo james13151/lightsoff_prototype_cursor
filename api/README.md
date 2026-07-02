@@ -7,11 +7,22 @@ Minimal Fastify service over the Phase 0 foundation schema. Its defining propert
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | liveness |
-| POST | `/v1/tenants` | create tenant, caller becomes owner |
+| POST | `/v1/tenants` | create tenant, caller becomes owner (chart of accounts auto-seeds) |
 | GET | `/v1/tenants` | tenants the caller belongs to (+ role) |
-| GET/POST | `/v1/vendors` | exemplar shared-entity CRUD — Phase 1 module tables follow this shape |
+| GET/POST | `/v1/vendors` | shared-entity CRUD |
+| GET/POST | `/v1/products` | products + variants (Shopify sync will upsert these later) |
 | GET/POST | `/v1/events` | the event bus: emit + poll (cursor on `seq`) |
 | GET/POST | `/v1/credentials` | integration vault: store secrets, list metadata (plaintext is never returned over HTTP) |
+| GET/POST | `/v1/purchase-orders` | POs with line items; `POST /:id/send` for draft→sent |
+| GET/POST | `/v1/receipts` | create + finalize atomically: writes the inventory ledger, rolls PO status, flags discrepancies |
+| GET | `/v1/stock` | live stock per variant from the inventory ledger |
+| GET | `/v1/inventory-ledger` | append-only stock movement history |
+| GET | `/v1/accounts` | chart of accounts with live balances |
+| GET/POST | `/v1/journal` | journal entries (manual entries balance-checked by the DB) |
+| GET/POST | `/v1/bills` | vendor bills; creation auto-posts expense ← AP to the journal |
+| POST | `/v1/payments` | payment + allocations; auto-posts AP ← Cash, rolls bill status |
+| GET/POST | `/v1/expense-claims` | petty-cash claims; `POST /:id/approve` and `/:id/reject` (admin-gated in the DB) |
+| GET | `/v1/finance/summary` | cash, petty cash, AP, revenue, expenses, net profit — straight from the journal |
 
 All `/v1/*` routes require a `Bearer` JWT (HS256, `sub` = user id).
 
