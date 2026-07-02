@@ -1,6 +1,8 @@
 import Fastify from 'fastify'
 import { requireAuth } from './auth.js'
 import { withUser } from './db.js'
+import { inventoryRoutes } from './routes/inventory.js'
+import { financeRoutes } from './routes/finance.js'
 
 export function buildServer() {
   const app = Fastify({ logger: true })
@@ -9,6 +11,9 @@ export function buildServer() {
 
   app.register(async (authed) => {
     authed.addHook('preHandler', requireAuth)
+
+    inventoryRoutes(authed)
+    financeRoutes(authed)
 
     // ---- Tenants ----
 

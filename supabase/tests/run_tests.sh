@@ -34,5 +34,7 @@ on conflict do nothing;
 SQL
 
 PGPASSWORD=test_user psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U test_user -d "$DB" -f "$DIR/rls_isolation_test.sql"
-
 echo "OK: Phase 0 test suite passed."
+
+PGPASSWORD=test_user psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U test_user -d "$DB" -f "$DIR/phase1_spine_test.sql"
+echo "OK: Phase 1 test suite passed."
