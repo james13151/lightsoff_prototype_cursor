@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import type { Confidence } from '../types'
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -55,6 +55,7 @@ export function Button({
   className = '',
   disabled = false,
   title,
+  type = 'button',
 }: {
   children: ReactNode
   onClick?: () => void
@@ -62,6 +63,7 @@ export function Button({
   className?: string
   disabled?: boolean
   title?: string
+  type?: 'button' | 'submit' | 'reset'
 }) {
   const variants = {
     primary: 'bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-50',
@@ -71,7 +73,7 @@ export function Button({
   }
   return (
     <button
-      type="button"
+      type={type}
       title={title}
       disabled={disabled}
       onClick={onClick}
@@ -101,4 +103,37 @@ export function timeAgo(iso: string): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   return `${days}d ago`
+}
+
+export function FormPanel({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <Card className={`p-4 ${className}`}>
+      <h3 className="mb-3 text-sm font-semibold text-slate-800">{title}</h3>
+      <div className="space-y-3">{children}</div>
+    </Card>
+  )
+}
+
+export function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+const inputClass =
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300'
+
+export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={`${inputClass} ${props.className ?? ''}`} />
+}
+
+export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={`${inputClass} ${props.className ?? ''}`} />
+}
+
+export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={`${inputClass} min-h-[72px] resize-y ${props.className ?? ''}`} />
 }
