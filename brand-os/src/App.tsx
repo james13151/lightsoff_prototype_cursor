@@ -1,0 +1,137 @@
+import { useEffect, useState } from 'react'
+import { useStore } from './store'
+import { CaptureBar } from './components/CaptureBar'
+import { Digest } from './components/Digest'
+import { Inventory } from './components/Inventory'
+import { Finance } from './components/Finance'
+import { Inbox } from './components/Inbox'
+import { Marketing } from './components/Marketing'
+import { Kanban } from './components/Kanban'
+import { Collab } from './components/Collab'
+import { EventBus } from './components/EventBus'
+import { SettingsView } from './components/SettingsView'
+
+export type View =
+  | 'digest'
+  | 'inventory'
+  | 'finance'
+  | 'inbox'
+  | 'marketing'
+  | 'rnd'
+  | 'collab'
+  | 'events'
+  | 'settings'
+
+export interface Nav {
+  view: View
+  focusId?: string
+}
+
+const NAV_ITEMS: { view: View; label: string; icon: string; group: string }[] = [
+  { view: 'digest', label: 'Daily Digest', icon: '☀️', group: 'Surfaces' },
+  { view: 'inventory', label: 'Inventory & Procurement', icon: '📦', group: 'Modules' },
+  { view: 'finance', label: 'Finance', icon: '💰', group: 'Modules' },
+  { view: 'inbox', label: 'Unified Inbox', icon: '💬', group: 'Modules' },
+  { view: 'marketing', label: 'Marketing', icon: '📣', group: 'Modules' },
+  { view: 'rnd', label: 'R&D Kanban', icon: '🧪', group: 'Modules' },
+  { view: 'collab', label: 'Internal Collab', icon: '🎫', group: 'Modules' },
+  { view: 'events', label: 'Event Bus', icon: '⚡', group: 'System' },
+  { view: 'settings', label: 'AI Settings', icon: '⚙️', group: 'System' },
+]
+
+export default function App() {
+  const { state, dispatch } = useStore()
+  const [nav, setNav] = useState<Nav>({ view: 'digest' })
+
+  useEffect(() => {
+    if (!state.toast) return
+    const t = setTimeout(() => dispatch({ type: 'SET_TOAST', message: null }), 4200)
+    return () => clearTimeout(t)
+  }, [state.toast, dispatch])
+
+  const navigate = (view: View, focusId?: string) => setNav({ view, focusId })
+
+  const openTicketCount = state.tickets.filter((t) => t.status !== 'resolved').length
+  const openConvCount = state.conversations.filter((c) => c.status === 'open').length
+
+  const badgeFor = (view: View): number => {
+    if (view === 'inbox') return openConvCount
+    if (view === 'collab') return openTicketCount
+    return 0
+  }
+
+  let content
+  switch (nav.view) {
+    case 'digest': content = <Digest navigate={navigate} />; break
+    case 'inventory': content = <Inventory />; break
+    case 'finance': content = <Finance />; break
+    case 'inbox': content = <Inbox focusId={nav.focusId} />; break
+    case 'marketing': content = <Marketing />; break
+    case 'rnd': content = <Kanban focusId={nav.focusId} />; break
+    case 'collab': content = <Collab focusId={nav.focusId} />; break
+    case 'events': content = <EventBus />; break
+    case 'settings': content = <SettingsView />; break
+  }
+
+  const groups = ['Surfaces', 'Modules', 'System']
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      {/* Sidebar */}
+      <aside className="fixed inset-y-0 left-0 w-60 border-r border-slate-200 bg-white">
+        <div className="flex items-center gap-2 px-5 py-5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">B</div>
+          <div>
+            <div className="text-sm font-semibold leading-tight">Brand OS</div>
+            <div className="text-[11px] text-slate-400">AI operator · prototype</div>
+          </div>
+        </div>
+        <nav className="px-3">
+          {groups.map((group) => (
+            <div key={group} className="mb-3">
+              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group}</div>
+              {NAV_ITEMS.filter((i) => i.group === group).map((item) => {
+                const active = nav.view === item.view
+                const badge = badgeFor(item.view)
+                return (
+                  <button
+                    key={item.view}
+                    onClick={() => navigate(item.view)}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors cursor-pointer ${
+                      active ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-sm">{item.icon}</span>
+                    <span className="flex-1">{item.label}</span>
+                    {badge > 0 && (
+                      <span className="rounded-full bg-rose-100 px-1.5 text-[10px] font-semibold text-rose-600">{badge}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
+        <div className="absolute bottom-0 left-0 right-0 border-t border-slate-100 px-5 py-3">
+          <div className="text-[11px] text-slate-400">
+            Tenant: <span className="font-medium text-slate-600">solo-brand.myshopify.com</span>
+          </div>
+          <div className="mt-0.5 text-[11px] text-emerald-600">● Shopify sync live (simulated)</div>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="pl-60">
+        <CaptureBar />
+        <main className="mx-auto max-w-5xl px-8 py-6">{content}</main>
+      </div>
+
+      {/* Toast */}
+      {state.toast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg">
+          {state.toast}
+        </div>
+      )}
+    </div>
+  )
+}
