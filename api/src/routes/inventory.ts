@@ -66,7 +66,8 @@ export function inventoryRoutes(app: FastifyInstance) {
     return withUser(req.userId, async (db) => {
       const r = await db.query(
         `select p.*, coalesce(jsonb_agg(jsonb_build_object(
-                  'id', v.id, 'sku', v.sku, 'price', v.price, 'reorder_point', v.reorder_point
+                  'id', v.id, 'sku', v.sku, 'title', v.title,
+                  'price', v.price, 'unit_cost', v.unit_cost, 'reorder_point', v.reorder_point
                 ) order by v.sku) filter (where v.id is not null), '[]') as variants
            from app.products p
            left join app.variants v on v.product_id = p.id
@@ -221,6 +222,43 @@ export function inventoryRoutes(app: FastifyInstance) {
       )
       return r.rows
     })
+  })
+
+  // Manual stock correction — writes an append-only ledger entry (spec §4.1 fallback path).
+  app.post<{
+    Body: { tenant_id: string; variant_id: string; qty_delta: number; memo?: string }
+  }>('/v1/inventory-adjustments', async (req, reply) => {
+    const { tenant_id, variant_id, qty_delta, memo } = req.body ?? {}
+    if (!tenant_id || !variant_id || qty_delta === undefined || qty_delta === 0) {
+      return reply.code(400).send({ error: 'tenant_id, variant_id and non-zero qty_delta are required' })
+    }
+    try {
+      const entry = await withUser(req.userId, async (db) => {
+        const r = await db.query(
+          `insert into app.inventory_ledger_entries
+             (tenant_id, variant_id, qty_delta, reason, ref_type, ref_id)
+           values ($1, $2, $3, 'manual_adjustment', 'adjustment', gen_random_uuid())
+           returning *`,
+          [tenant_id, variant_id, qty_delta],
+        )
+        const created = r.rows[0]
+        await db.query('select app.emit_event($1, $2, $3)', [
+          tenant_id,
+          'inventory.adjusted',
+          JSON.stringify({
+            variant_id,
+            qty_delta,
+            ledger_entry_id: created.id,
+            memo: memo ?? null,
+          }),
+        ])
+        return created
+      })
+      return reply.code(201).send(entry)
+    } catch (err) {
+      if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
+      throw err
+    }
   })
 
   app.get<{ Querystring: { tenant_id?: string; variant_id?: string } }>('/v1/inventory-ledger', async (req, reply) => {

@@ -17,6 +17,7 @@ Minimal Fastify service over the Phase 0 foundation schema. Its defining propert
 | GET/POST | `/v1/receipts` | create + finalize atomically: writes the inventory ledger, rolls PO status, flags discrepancies |
 | GET | `/v1/stock` | live stock per variant from the inventory ledger |
 | GET | `/v1/inventory-ledger` | append-only stock movement history |
+| POST | `/v1/inventory-adjustments` | manual stock correction (append-only ledger entry) |
 | GET | `/v1/accounts` | chart of accounts with live balances |
 | GET/POST | `/v1/journal` | journal entries (manual entries balance-checked by the DB) |
 | GET/POST | `/v1/bills` | vendor bills; creation auto-posts expense ← AP to the journal |

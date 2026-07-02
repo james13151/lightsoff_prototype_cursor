@@ -64,6 +64,14 @@ type Action =
   | { type: 'SET_AUTO_APPLY'; value: boolean }
   | { type: 'SET_TOAST'; message: string | null }
   | { type: 'HYDRATE'; spine: SpineSnapshot }
+  | { type: 'ADD_VENDOR'; name: string; leadTimeDays?: number }
+  | { type: 'ADD_PRODUCT'; title: string; sku: string; price?: number; unitCost?: number; reorderPoint?: number }
+  | { type: 'CREATE_PO'; vendorId: string; variantId: string; qty: number; unitCost: number; send?: boolean }
+  | { type: 'CREATE_RECEIPT'; vendorId: string; poId?: string; variantId: string; qty: number; receiptType?: 'commercial' | 'sample'; description?: string }
+  | { type: 'ADJUST_STOCK'; variantId: string; qtyDelta: number; memo?: string }
+  | { type: 'CREATE_BILL'; vendorId: string; amount: number; dueDate?: string; memo?: string }
+  | { type: 'CREATE_EXPENSE_CLAIM'; vendorName: string; amount: number; category: string; autoApprove?: boolean }
+  | { type: 'CREATE_JOURNAL'; memo: string; lines: { account: string; debit: number; credit: number }[] }
 
 let seq = 1000
 const nid = (prefix: string) => `${prefix}-${++seq}`
@@ -231,6 +239,186 @@ function reducer(state: AppState, action: Action): AppState {
         events: action.spine.events,
         financeSummary: action.spine.financeSummary,
       }
+    case 'ADD_VENDOR': {
+      const vendor: Vendor = {
+        id: nid('v'),
+        name: action.name,
+        leadTimeDays: action.leadTimeDays ?? 14,
+        isRecurring: true,
+      }
+      return {
+        ...state,
+        vendors: [...state.vendors, vendor],
+        events: pushEvent(state, 'vendor.created', 'Inventory', `Vendor "${action.name}" added`),
+        toast: `Vendor "${action.name}" created.`,
+      }
+    }
+    case 'ADD_PRODUCT': {
+      const product: Product = {
+        id: nid('p'),
+        sku: action.sku,
+        name: action.title,
+        stock: 0,
+        reorderPoint: action.reorderPoint ?? 0,
+        unitCost: action.unitCost ?? 0,
+        price: action.price ?? 0,
+        salesVelocityPerDay: 0,
+        shopifySynced: false,
+      }
+      return {
+        ...state,
+        products: [...state.products, product],
+        events: pushEvent(state, 'product.created', 'Inventory', `Product ${action.sku} added to master data`),
+        toast: `Product ${action.sku} created.`,
+      }
+    }
+    case 'CREATE_PO': {
+      const po: PurchaseOrder = {
+        id: nid('PO'),
+        vendorId: action.vendorId,
+        status: action.send ? 'sent' : 'draft',
+        source: 'manual',
+        createdAt: now(),
+        lines: [{ productId: action.variantId, qty: action.qty, unitCost: action.unitCost }],
+      }
+      return {
+        ...state,
+        purchaseOrders: [po, ...state.purchaseOrders],
+        events: pushEvent(state, 'po.drafted', 'Inventory', `${po.id} created (${action.qty} units)`),
+        toast: `Purchase order ${po.id} ${action.send ? 'sent' : 'saved as draft'}.`,
+      }
+    }
+    case 'CREATE_RECEIPT': {
+      const product = action.variantId ? state.products.find((p) => p.id === action.variantId) : undefined
+      const receipt: Receipt = {
+        id: nid('RCV'),
+        poId: action.poId ?? null,
+        vendorId: action.vendorId,
+        type: action.receiptType ?? 'commercial',
+        createdAt: now(),
+        lines: [{
+          productId: action.variantId || null,
+          description: action.description ?? product?.name ?? 'Sample item',
+          qty: action.qty,
+        }],
+        discrepancy: null,
+      }
+      const next: AppState = {
+        ...state,
+        receipts: [receipt, ...state.receipts],
+        events: pushEvent(state, 'inventory.received', 'Inventory', `${receipt.id}: +${action.qty} received`),
+        toast: `Receipt ${receipt.id} recorded.`,
+      }
+      if (action.receiptType !== 'sample' && product) {
+        const entry: InventoryLedgerEntry = {
+          id: nid('il'),
+          productId: product.id,
+          qtyDelta: action.qty,
+          reason: 'po_receipt',
+          refId: receipt.id,
+          at: now(),
+        }
+        return {
+          ...next,
+          ledger: [entry, ...next.ledger],
+          products: next.products.map((p) => (p.id === product.id ? { ...p, stock: p.stock + action.qty } : p)),
+        }
+      }
+      return next
+    }
+    case 'ADJUST_STOCK': {
+      const product = state.products.find((p) => p.id === action.variantId)
+      if (!product) return { ...state, toast: 'Product not found.' }
+      const refId = nid('adj')
+      const entry: InventoryLedgerEntry = {
+        id: nid('il'),
+        productId: product.id,
+        qtyDelta: action.qtyDelta,
+        reason: 'manual_adjustment',
+        refId,
+        at: now(),
+      }
+      return {
+        ...state,
+        ledger: [entry, ...state.ledger],
+        products: state.products.map((p) =>
+          p.id === product.id ? { ...p, stock: p.stock + action.qtyDelta } : p,
+        ),
+        events: pushEvent(state, 'inventory.adjusted', 'Inventory', `${product.sku} ${action.qtyDelta > 0 ? '+' : ''}${action.qtyDelta}`),
+        toast: `Stock adjusted for ${product.sku}.`,
+      }
+    }
+    case 'CREATE_BILL': {
+      const bill: VendorBill = {
+        id: nid('BILL'),
+        vendorId: action.vendorId,
+        amount: action.amount,
+        dueDate: action.dueDate ?? now().slice(0, 10),
+        status: 'unpaid',
+        memo: action.memo ?? 'Manual bill',
+        anomaly: null,
+      }
+      return {
+        ...state,
+        bills: [bill, ...state.bills],
+        events: pushEvent(state, 'bill.created', 'Finance', `${bill.id} — $${action.amount.toFixed(2)}`),
+        toast: `Bill ${bill.id} created.`,
+      }
+    }
+    case 'CREATE_EXPENSE_CLAIM': {
+      const claim: ExpenseClaim = {
+        id: nid('EC'),
+        vendorName: action.vendorName,
+        amount: action.amount,
+        category: action.category,
+        date: now(),
+        status: action.autoApprove ? 'approved' : 'pending_review',
+        confidence: 1,
+        source: 'manual',
+      }
+      let next: AppState = {
+        ...state,
+        claims: [claim, ...state.claims],
+        events: pushEvent(
+          state,
+          action.autoApprove ? 'claim.approved' : 'claim.pending',
+          'Finance',
+          `Expense claim ${claim.id} — $${action.amount.toFixed(2)}`,
+        ),
+        toast: action.autoApprove ? 'Claim approved and posted.' : 'Claim submitted for review.',
+      }
+      if (action.autoApprove) {
+        const je: JournalEntry = {
+          id: nid('JE'),
+          memo: `Expense claim ${claim.id} — ${claim.vendorName} (${claim.category})`,
+          source: 'expense_claim',
+          at: now(),
+          autoPosted: false,
+          lines: [
+            { account: claim.category, debit: claim.amount, credit: 0 },
+            { account: 'Petty Cash', debit: 0, credit: claim.amount },
+          ],
+        }
+        next = { ...next, journal: [je, ...next.journal] }
+      }
+      return next
+    }
+    case 'CREATE_JOURNAL': {
+      const je: JournalEntry = {
+        id: nid('JE'),
+        memo: action.memo,
+        source: 'manual',
+        at: now(),
+        autoPosted: false,
+        lines: action.lines,
+      }
+      return {
+        ...state,
+        journal: [je, ...state.journal],
+        events: pushEvent(state, 'journal.posted', 'Finance', action.memo),
+        toast: `Journal entry ${je.id} posted.`,
+      }
+    }
     default:
       return state
   }
@@ -407,8 +595,10 @@ const StoreContext = createContext<{
   state: AppState
   dispatch: (action: Action) => void | Promise<void>
   refresh: () => Promise<void>
+  spineMutate: (live: () => Promise<unknown>, demo: Action) => Promise<void>
   mode: 'demo' | 'live'
   loading: boolean
+  auth: AuthSession | null
 } | null>(null)
 
 const SPINE_ACTIONS = new Set(['PAY_BILL', 'APPROVE_CLAIM', 'REJECT_CLAIM', 'CREATE_REORDER_PO'])
@@ -452,6 +642,22 @@ export function StoreProvider({
     void refresh()
   }, [refresh])
 
+  const spineMutate = useCallback(
+    async (live: () => Promise<unknown>, demo: Action) => {
+      try {
+        if (mode === 'live' && auth) {
+          await live()
+          await refresh()
+        } else {
+          rawDispatch(demo)
+        }
+      } catch (err) {
+        rawDispatch({ type: 'SET_TOAST', message: (err as Error).message })
+      }
+    },
+    [mode, auth, refresh],
+  )
+
   const dispatch = useCallback(
     async (action: Action) => {
       const isLiveSpine =
@@ -482,7 +688,7 @@ export function StoreProvider({
   )
 
   return (
-    <StoreContext.Provider value={{ state, dispatch, refresh, mode, loading }}>
+    <StoreContext.Provider value={{ state, dispatch, refresh, spineMutate, mode, loading, auth }}>
       {children}
     </StoreContext.Provider>
   )

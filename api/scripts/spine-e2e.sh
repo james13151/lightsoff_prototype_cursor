@@ -63,6 +63,18 @@ curl -sf -X POST $BASE/v1/receipts -H "$AUTH" -H "$JSON" \
 curl -sf "$BASE/v1/stock?tenant_id=$TENANT" -H "$AUTH" | python3 -c '
 import json,sys; s = json.load(sys.stdin)[0]; assert s["on_hand"] == 97, s; print("stock still:", s["on_hand"])'
 
+curl -sf "$BASE/v1/stock?tenant_id=$TENANT" -H "$AUTH" | python3 -c '
+import json,sys; s = json.load(sys.stdin)[0]; assert s["on_hand"] == 97, s; print("stock still:", s["on_hand"])'
+
+step "manual inventory adjustment -> stock 95"
+curl -sf -X POST $BASE/v1/inventory-adjustments -H "$AUTH" -H "$JSON" \
+  -d "{\"tenant_id\":\"$TENANT\",\"variant_id\":\"$VARIANT\",\"qty_delta\":-2,\"memo\":\"cycle count\"}" > /dev/null
+curl -sf "$BASE/v1/stock?tenant_id=$TENANT" -H "$AUTH" | python3 -c '
+import json,sys
+s = json.load(sys.stdin)[0]
+assert s["on_hand"] == 95, s
+print("stock after adjustment:", s["on_hand"])'
+
 step "create bill 1850 -> journal auto-posts, AP = 1850"
 BILL=$(curl -sf -X POST $BASE/v1/bills -H "$AUTH" -H "$JSON" \
   -d "{\"tenant_id\":\"$TENANT\",\"vendor_id\":\"$VENDOR\",\"po_id\":\"$PO\",\"amount\":1850,\"bill_number\":\"INV-100\",\"due_date\":\"2026-07-16\"}" \
@@ -116,7 +128,7 @@ curl -sf "$BASE/v1/events?tenant_id=$TENANT" -H "$AUTH" | python3 -c '
 import json,sys
 types = [e["type"] for e in json.load(sys.stdin)]
 for expected in ["vendor.created","po.created","po.sent","inventory.received","inventory.discrepancy_flagged",
-                 "po.partially_received","bill.created","journal.posted","payment.recorded","bill.paid",
+                 "inventory.adjusted","po.partially_received","bill.created","journal.posted","payment.recorded","bill.paid",
                  "claim.submitted","claim.approved"]:
     assert expected in types, f"missing event {expected}: {types}"
 print(len(types), "events, all expected types present")'

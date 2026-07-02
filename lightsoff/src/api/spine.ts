@@ -52,6 +52,10 @@ function eventSummary(type: string, payload: Record<string, unknown>): string {
   if (type === 'bill.paid') return `Bill paid — $${Number(payload.amount).toFixed(2)}`
   if (type === 'claim.approved') return `Claim approved — $${Number(payload.amount).toFixed(2)}`
   if (type === 'journal.posted') return String(payload.memo ?? 'Journal entry posted')
+  if (type === 'inventory.adjusted') {
+    const delta = Number(payload.qty_delta)
+    return `Stock adjusted ${delta > 0 ? '+' : ''}${delta}`
+  }
   return type
 }
 
