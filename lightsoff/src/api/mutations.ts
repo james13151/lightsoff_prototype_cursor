@@ -28,13 +28,25 @@ export async function fetchAccounts(token: string, tenantId: string): Promise<Ac
 export async function createVendor(
   token: string,
   tenantId: string,
-  data: { name: string; leadTimeDays?: number; contactEmail?: string },
+  data: {
+    name: string
+    leadTimeDays?: number
+    contactEmail?: string
+    phone?: string
+    paymentTerms?: string
+    notes?: string
+    isRecurring?: boolean
+  },
 ) {
   return post(token, '/v1/vendors', {
     tenant_id: tenantId,
     name: data.name,
     lead_time_days: data.leadTimeDays,
     contact_email: data.contactEmail,
+    phone: data.phone,
+    payment_terms: data.paymentTerms,
+    notes: data.notes,
+    is_recurring: data.isRecurring,
   })
 }
 
@@ -133,14 +145,39 @@ export async function createPurchaseOrder(
 export async function createWarehouse(
   token: string,
   tenantId: string,
-  data: { code: string; name: string; isDefault?: boolean; address?: Record<string, unknown> },
+  data: {
+    code: string
+    name: string
+    isDefault?: boolean
+    contactName?: string
+    contactEmail?: string
+    contactPhone?: string
+    address?: {
+      line1?: string
+      line2?: string
+      city?: string
+      state?: string
+      postalCode?: string
+      country?: string
+    }
+  },
 ) {
   return post(token, '/v1/warehouses', {
     tenant_id: tenantId,
     code: data.code,
     name: data.name,
     is_default: data.isDefault,
-    address: data.address,
+    contact_name: data.contactName,
+    contact_email: data.contactEmail,
+    contact_phone: data.contactPhone,
+    address: data.address ? {
+      line1: data.address.line1,
+      line2: data.address.line2,
+      city: data.address.city,
+      state: data.address.state,
+      postal_code: data.address.postalCode,
+      country: data.address.country,
+    } : undefined,
   })
 }
 

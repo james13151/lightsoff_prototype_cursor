@@ -224,9 +224,18 @@ export function inventoryRoutes(app: FastifyInstance) {
   })
 
   app.post<{
-    Body: { tenant_id: string; code: string; name: string; is_default?: boolean; address?: Record<string, unknown> }
+    Body: {
+      tenant_id: string
+      code: string
+      name: string
+      is_default?: boolean
+      contact_name?: string
+      contact_email?: string
+      contact_phone?: string
+      address?: Record<string, unknown>
+    }
   }>('/v1/warehouses', async (req, reply) => {
-    const { tenant_id, code, name, is_default, address } = req.body ?? {}
+    const { tenant_id, code, name, is_default, contact_name, contact_email, contact_phone, address } = req.body ?? {}
     if (!tenant_id || !code?.trim() || !name?.trim()) {
       return reply.code(400).send({ error: 'tenant_id, code and name are required' })
     }
@@ -239,9 +248,9 @@ export function inventoryRoutes(app: FastifyInstance) {
           )
         }
         const r = await db.query(
-          `insert into app.warehouses (tenant_id, code, name, is_default, address)
-           values ($1, $2, $3, coalesce($4, false), coalesce($5, '{}'::jsonb)) returning *`,
-          [tenant_id, code.trim().toUpperCase(), name.trim(), is_default ?? false, JSON.stringify(address ?? {})],
+          `insert into app.warehouses (tenant_id, code, name, is_default, contact_name, contact_email, contact_phone, address)
+           values ($1, $2, $3, coalesce($4, false), $5, $6, $7, coalesce($8, '{}'::jsonb)) returning *`,
+          [tenant_id, code.trim().toUpperCase(), name.trim(), is_default ?? false, contact_name ?? null, contact_email ?? null, contact_phone ?? null, JSON.stringify(address ?? {})],
         )
         return r.rows[0]
       })

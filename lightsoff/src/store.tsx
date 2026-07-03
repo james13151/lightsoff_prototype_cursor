@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useReducer, useState
 import type {
   Vendor, Warehouse, StockByWarehouse, Product, ProductMaster, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill, VendorPayment,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
-  Settings, CaptureDraft, CardStage,
+  Settings, CaptureDraft, CardStage, LocationAddress,
 } from './types'
 import * as seed from './data/seed'
 import type { AuthSession } from './api/config'
@@ -72,8 +72,8 @@ type Action =
   | { type: 'SET_AUTO_APPLY'; value: boolean }
   | { type: 'SET_TOAST'; message: string | null }
   | { type: 'HYDRATE'; spine: SpineSnapshot }
-  | { type: 'ADD_VENDOR'; name: string; leadTimeDays?: number }
-  | { type: 'CREATE_WAREHOUSE'; code: string; name: string; isDefault?: boolean }
+  | { type: 'ADD_VENDOR'; name: string; leadTimeDays?: number; contactEmail?: string; phone?: string; paymentTerms?: string; notes?: string; isRecurring?: boolean }
+  | { type: 'CREATE_WAREHOUSE'; code: string; name: string; isDefault?: boolean; contactName?: string; contactEmail?: string; contactPhone?: string; address?: LocationAddress }
   | { type: 'ADD_PRODUCT'; title: string; sku: string; price?: number; unitCost?: number; reorderPoint?: number }
   | { type: 'CREATE_PO'; vendorId: string; variantId: string; qty: number; unitCost: number; send?: boolean }
   | { type: 'CREATE_RECEIPT'; vendorId: string; poId?: string; variantId: string; qty: number; warehouseId?: string; receiptType?: 'commercial' | 'sample'; description?: string }
@@ -257,7 +257,11 @@ function reducer(state: AppState, action: Action): AppState {
         id: nid('v'),
         name: action.name,
         leadTimeDays: action.leadTimeDays ?? 14,
-        isRecurring: true,
+        isRecurring: action.isRecurring ?? true,
+        contactEmail: action.contactEmail,
+        phone: action.phone,
+        paymentTerms: action.paymentTerms,
+        notes: action.notes,
       }
       return {
         ...state,
@@ -272,6 +276,10 @@ function reducer(state: AppState, action: Action): AppState {
         code: action.code.toUpperCase(),
         name: action.name,
         isDefault: action.isDefault ?? false,
+        contactName: action.contactName,
+        contactEmail: action.contactEmail,
+        contactPhone: action.contactPhone,
+        address: action.address,
       }
       const warehouses = action.isDefault
         ? state.warehouses.map((w) => ({ ...w, isDefault: false }))

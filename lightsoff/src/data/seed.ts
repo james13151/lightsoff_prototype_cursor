@@ -15,15 +15,23 @@ const daysFromNow = (n: number) => {
 }
 
 export const vendors: Vendor[] = [
-  { id: 'v1', name: 'Acme Textiles', leadTimeDays: 12, isRecurring: true },
-  { id: 'v2', name: 'Pacific Trims Co.', leadTimeDays: 8, isRecurring: true },
-  { id: 'v3', name: 'Northwind Packaging', leadTimeDays: 5, isRecurring: true },
-  { id: 'v4', name: 'Kyoto Fabric Lab', leadTimeDays: 21, isRecurring: false },
+  { id: 'v1', name: 'Acme Textiles', leadTimeDays: 12, isRecurring: true, contactEmail: 'orders@acmetextiles.com', phone: '+1 415-555-0101', paymentTerms: 'Net 30' },
+  { id: 'v2', name: 'Pacific Trims Co.', leadTimeDays: 8, isRecurring: true, contactEmail: 'ap@pacifictrims.com', phone: '+1 213-555-0182', paymentTerms: 'Net 15' },
+  { id: 'v3', name: 'Northwind Packaging', leadTimeDays: 5, isRecurring: true, contactEmail: 'billing@northwindpkg.com', phone: '+1 503-555-0144', paymentTerms: 'Due on receipt' },
+  { id: 'v4', name: 'Kyoto Fabric Lab', leadTimeDays: 21, isRecurring: false, contactEmail: 'hello@kyotofabric.jp', phone: '+81 75-555-0199', paymentTerms: '50% deposit, Net 30' },
 ]
 
 export const warehouses: Warehouse[] = [
-  { id: 'wh-main', code: 'MAIN', name: 'Main warehouse', isDefault: true },
-  { id: 'wh-3pl', code: '3PL-EAST', name: 'East coast 3PL', isDefault: false },
+  {
+    id: 'wh-main', code: 'MAIN', name: 'Main warehouse', isDefault: true,
+    contactName: 'Receiving desk', contactEmail: 'receiving@brand.com', contactPhone: '+1 415-555-0200',
+    address: { line1: '1200 Market St', city: 'San Francisco', state: 'CA', postalCode: '94103', country: 'US' },
+  },
+  {
+    id: 'wh-3pl', code: '3PL-EAST', name: 'East coast 3PL', isDefault: false,
+    contactName: 'Fulfillment ops', contactEmail: 'ops@3pleast.com', contactPhone: '+1 732-555-0300',
+    address: { line1: '88 Industrial Pkwy', line2: 'Unit 4', city: 'Newark', state: 'NJ', postalCode: '07114', country: 'US' },
+  },
 ]
 
 export const stockByWarehouse: StockByWarehouse[] = [

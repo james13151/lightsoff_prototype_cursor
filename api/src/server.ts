@@ -64,19 +64,19 @@ export function buildServer() {
       })
     })
 
-    authed.post<{ Body: { tenant_id: string; name: string; lead_time_days?: number; contact_email?: string } }>(
+    authed.post<{ Body: { tenant_id: string; name: string; lead_time_days?: number; contact_email?: string; phone?: string; payment_terms?: string; notes?: string; is_recurring?: boolean } }>(
       '/v1/vendors',
       async (req, reply) => {
-        const { tenant_id, name, lead_time_days, contact_email } = req.body ?? {}
+        const { tenant_id, name, lead_time_days, contact_email, phone, payment_terms, notes, is_recurring } = req.body ?? {}
         if (!tenant_id || !name?.trim()) {
           return reply.code(400).send({ error: 'tenant_id and name are required' })
         }
         try {
           const vendor = await withUser(req.userId, async (db) => {
             const r = await db.query(
-              `insert into app.vendors (tenant_id, name, lead_time_days, contact_email)
-               values ($1, $2, $3, $4) returning *`,
-              [tenant_id, name.trim(), lead_time_days ?? null, contact_email ?? null],
+              `insert into app.vendors (tenant_id, name, lead_time_days, contact_email, phone, payment_terms, notes, is_recurring)
+               values ($1, $2, $3, $4, $5, $6, $7, coalesce($8, true)) returning *`,
+              [tenant_id, name.trim(), lead_time_days ?? null, contact_email ?? null, phone ?? null, payment_terms ?? null, notes ?? null, is_recurring ?? null],
             )
             return r.rows[0]
           })

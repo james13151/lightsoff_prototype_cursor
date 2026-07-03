@@ -1,13 +1,13 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useStore } from '../store'
 import {
   adjustInventory, createProduct, createPurchaseOrder, createReceipt, createVendor, createWarehouse,
 } from '../api/mutations'
 import {
-  Badge, Button, Card, Field, FormPanel, Input, SectionTitle, Select, SubTabs, timeAgo,
+  Badge, Button, Card, Field, FormPanel, Input, SectionTitle, Select, SubTabs, TextArea, timeAgo,
 } from './ui'
-import { cartesianProduct } from '../lib/matrix'
-import type { POLineItem } from '../types'
+import { cartesianProduct, variantSku, variantTitle } from '../lib/matrix'
+import type { LocationAddress, POLineItem } from '../types'
 
 const PO_STATUS_TONE: Record<string, string> = {
   draft: 'slate', sent: 'sky', partially_received: 'amber', received: 'emerald', closed: 'slate',
@@ -39,6 +39,11 @@ export function Inventory() {
 
   const [vendorNameInput, setVendorNameInput] = useState('')
   const [vendorLead, setVendorLead] = useState('14')
+  const [vendorEmail, setVendorEmail] = useState('')
+  const [vendorPhone, setVendorPhone] = useState('')
+  const [vendorPaymentTerms, setVendorPaymentTerms] = useState('Net 30')
+  const [vendorNotes, setVendorNotes] = useState('')
+  const [vendorRecurring, setVendorRecurring] = useState(true)
   const [productTitle, setProductTitle] = useState('')
   const [productBrand, setProductBrand] = useState('')
   const [productDesc, setProductDesc] = useState('')
@@ -67,6 +72,43 @@ export function Inventory() {
   const [whCode, setWhCode] = useState('')
   const [whName, setWhName] = useState('')
   const [whDefault, setWhDefault] = useState(false)
+  const [whContactName, setWhContactName] = useState('')
+  const [whContactEmail, setWhContactEmail] = useState('')
+  const [whContactPhone, setWhContactPhone] = useState('')
+  const [whAddrLine1, setWhAddrLine1] = useState('')
+  const [whAddrLine2, setWhAddrLine2] = useState('')
+  const [whCity, setWhCity] = useState('')
+  const [whState, setWhState] = useState('')
+  const [whPostal, setWhPostal] = useState('')
+  const [whCountry, setWhCountry] = useState('')
+  const [variantEdits, setVariantEdits] = useState<Record<string, { sku: string; price: string; unitCost: string }>>({})
+
+  const productOptions = useMemo(() => [
+    opt1Name.trim() && opt1Values.trim() ? { name: opt1Name.trim(), values: opt1Values.split(',').map((s) => s.trim()).filter(Boolean) } : null,
+    opt2Name.trim() && opt2Values.trim() ? { name: opt2Name.trim(), values: opt2Values.split(',').map((s) => s.trim()).filter(Boolean) } : null,
+  ].filter(Boolean) as { name: string; values: string[] }[], [opt1Name, opt1Values, opt2Name, opt2Values])
+
+  const variantRows = useMemo(() => {
+    const combos = productOptions.length ? cartesianProduct(productOptions) : [{}]
+    return combos.map((ov) => {
+      const key = Object.entries(ov).map(([k, v]) => `${k}=${v}`).join('|') || 'default'
+      const edits = variantEdits[key]
+      return {
+        key,
+        title: Object.keys(ov).length ? variantTitle(ov) : 'Default',
+        optionValues: ov,
+        sku: edits?.sku ?? variantSku(productSku, ov),
+        price: edits?.price ?? productPrice,
+        unitCost: edits?.unitCost ?? productCost,
+      }
+    })
+  }, [productOptions, productSku, productPrice, productCost, variantEdits])
+
+  function formatAddress(addr?: LocationAddress) {
+    if (!addr) return null
+    const parts = [addr.line1, addr.line2, [addr.city, addr.state].filter(Boolean).join(', '), addr.postalCode, addr.country].filter(Boolean)
+    return parts.join(' · ')
+  }
 
   const stockRows = stockWarehouseFilter
     ? state.stockByWarehouse.filter((s) => s.warehouseId === stockWarehouseFilter && s.onHand !== 0)
@@ -76,54 +118,96 @@ export function Inventory() {
     e.preventDefault()
     if (!vendorNameInput.trim()) return
     const lead = Number(vendorLead) || 14
+    const payload = {
+      name: vendorNameInput.trim(),
+      leadTimeDays: lead,
+      contactEmail: vendorEmail.trim() || undefined,
+      phone: vendorPhone.trim() || undefined,
+      paymentTerms: vendorPaymentTerms.trim() || undefined,
+      notes: vendorNotes.trim() || undefined,
+      isRecurring: vendorRecurring,
+    }
     await spineMutate(
-      () => createVendor(auth!.token, auth!.tenantId, { name: vendorNameInput.trim(), leadTimeDays: lead }),
-      { type: 'ADD_VENDOR', name: vendorNameInput.trim(), leadTimeDays: lead },
+      () => createVendor(auth!.token, auth!.tenantId, payload),
+      { type: 'ADD_VENDOR', ...payload },
     )
     setVendorNameInput('')
+    setVendorEmail('')
+    setVendorPhone('')
+    setVendorNotes('')
   }
 
   async function onAddWarehouse(e: FormEvent) {
     e.preventDefault()
     if (!whCode.trim() || !whName.trim()) return
+    const address: LocationAddress = {
+      line1: whAddrLine1.trim() || undefined,
+      line2: whAddrLine2.trim() || undefined,
+      city: whCity.trim() || undefined,
+      state: whState.trim() || undefined,
+      postalCode: whPostal.trim() || undefined,
+      country: whCountry.trim() || undefined,
+    }
+    const payload = {
+      code: whCode.trim(),
+      name: whName.trim(),
+      isDefault: whDefault,
+      contactName: whContactName.trim() || undefined,
+      contactEmail: whContactEmail.trim() || undefined,
+      contactPhone: whContactPhone.trim() || undefined,
+      address: Object.values(address).some(Boolean) ? address : undefined,
+    }
     await spineMutate(
-      () => createWarehouse(auth!.token, auth!.tenantId, { code: whCode.trim(), name: whName.trim(), isDefault: whDefault }),
-      { type: 'CREATE_WAREHOUSE', code: whCode.trim(), name: whName.trim(), isDefault: whDefault },
+      () => createWarehouse(auth!.token, auth!.tenantId, payload),
+      { type: 'CREATE_WAREHOUSE', ...payload },
     )
     setWhCode('')
     setWhName('')
     setWhDefault(false)
+    setWhContactName('')
+    setWhContactEmail('')
+    setWhContactPhone('')
+    setWhAddrLine1('')
+    setWhAddrLine2('')
+    setWhCity('')
+    setWhState('')
+    setWhPostal('')
+    setWhCountry('')
   }
 
   async function onAddProduct(e: FormEvent) {
     e.preventDefault()
     if (!productTitle.trim() || !productSku.trim()) return
-    const price = Number(productPrice) || 0
-    const unitCost = Number(productCost) || 0
     const reorderPoint = Number(productReorder) || 0
-    const options = [
-      opt1Name.trim() && opt1Values.trim() ? { name: opt1Name.trim(), values: opt1Values.split(',').map((s) => s.trim()).filter(Boolean) } : null,
-      opt2Name.trim() && opt2Values.trim() ? { name: opt2Name.trim(), values: opt2Values.split(',').map((s) => s.trim()).filter(Boolean) } : null,
-    ].filter(Boolean) as { name: string; values: string[] }[]
+    const variants = variantRows.map((row) => ({
+      sku: row.sku.trim(),
+      title: row.title !== 'Default' ? row.title : undefined,
+      optionValues: row.optionValues,
+      price: Number(row.price) || 0,
+      unitCost: Number(row.unitCost) || 0,
+      reorderPoint,
+    }))
+    if (variants.some((v) => !v.sku)) return
     await spineMutate(
       () => createProduct(auth!.token, auth!.tenantId, {
         title: productTitle.trim(),
         brand: productBrand.trim() || undefined,
         description: productDesc.trim() || undefined,
         baseSku: productSku.trim(),
-        options,
-        price,
-        unitCost,
-        reorderPoint,
+        options: productOptions,
+        variants,
       }),
-      { type: 'ADD_PRODUCT', title: productTitle.trim(), sku: productSku.trim(), price, unitCost, reorderPoint },
+      { type: 'ADD_PRODUCT', title: productTitle.trim(), sku: variants[0].sku, price: variants[0].price, unitCost: variants[0].unitCost, reorderPoint },
     )
     setProductTitle('')
     setProductBrand('')
     setProductDesc('')
     setProductSku('')
+    setProductPrice('')
+    setProductCost('')
     setOpt1Values('')
     setOpt2Values('')
+    setVariantEdits({})
   }
 
   async function onCreatePo(e: FormEvent) {
@@ -293,9 +377,29 @@ export function Inventory() {
               <Field label="Name">
                 <Input value={vendorNameInput} onChange={(e) => setVendorNameInput(e.target.value)} placeholder="Acme Textiles" required />
               </Field>
-              <Field label="Lead time (days)">
-                <Input type="number" value={vendorLead} onChange={(e) => setVendorLead(e.target.value)} min={1} />
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Email">
+                  <Input type="email" value={vendorEmail} onChange={(e) => setVendorEmail(e.target.value)} placeholder="orders@vendor.com" />
+                </Field>
+                <Field label="Phone">
+                  <Input value={vendorPhone} onChange={(e) => setVendorPhone(e.target.value)} placeholder="+1 415-555-0100" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Lead time (days)">
+                  <Input type="number" value={vendorLead} onChange={(e) => setVendorLead(e.target.value)} min={1} />
+                </Field>
+                <Field label="Payment terms">
+                  <Input value={vendorPaymentTerms} onChange={(e) => setVendorPaymentTerms(e.target.value)} placeholder="Net 30" />
+                </Field>
+              </div>
+              <Field label="Notes">
+                <TextArea value={vendorNotes} onChange={(e) => setVendorNotes(e.target.value)} placeholder="Preferred carrier, account #, etc." />
               </Field>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={vendorRecurring} onChange={(e) => setVendorRecurring(e.target.checked)} />
+                Recurring vendor (auto-post bills)
+              </label>
               <Button type="submit" className="w-full">Create vendor</Button>
             </FormPanel>
           </form>
@@ -311,22 +415,22 @@ export function Inventory() {
                 </Field>
               </div>
               <Field label="Description">
-                <Input value={productDesc} onChange={(e) => setProductDesc(e.target.value)} placeholder="Midweight fleece hoodie" />
+                <TextArea value={productDesc} onChange={(e) => setProductDesc(e.target.value)} placeholder="Midweight fleece hoodie with kangaroo pocket" />
               </Field>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Base SKU">
                   <Input value={productSku} onChange={(e) => setProductSku(e.target.value)} placeholder="HOOD-BLU" required />
                 </Field>
-                <Field label="Reorder pt">
+                <Field label="Reorder pt (all variants)">
                   <Input type="number" value={productReorder} onChange={(e) => setProductReorder(e.target.value)} min={0} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Price (all variants)">
-                  <Input type="number" step="0.01" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} />
+                <Field label="Default price">
+                  <Input type="number" step="0.01" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="68.00" />
                 </Field>
-                <Field label="Unit cost">
-                  <Input type="number" step="0.01" value={productCost} onChange={(e) => setProductCost(e.target.value)} />
+                <Field label="Default unit cost">
+                  <Input type="number" step="0.01" value={productCost} onChange={(e) => setProductCost(e.target.value)} placeholder="18.50" />
                 </Field>
               </div>
               <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
@@ -345,27 +449,101 @@ export function Inventory() {
                     <Input value={opt2Values} onChange={(e) => setOpt2Values(e.target.value)} placeholder="Blue, Black" />
                   </Field>
                 </div>
-                {(opt1Values || opt2Values) && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Will generate {cartesianProduct([
-                      opt1Name.trim() && opt1Values.trim() ? { name: opt1Name.trim(), values: opt1Values.split(',').map((s) => s.trim()).filter(Boolean) } : { name: '_', values: [''] },
-                      opt2Name.trim() && opt2Values.trim() ? { name: opt2Name.trim(), values: opt2Values.split(',').map((s) => s.trim()).filter(Boolean) } : { name: '__', values: [''] },
-                    ].filter((o) => o.name !== '_' && o.name !== '__')).length || 1} SKU(s) from base {productSku || '…'}
-                  </p>
-                )}
               </div>
+              {variantRows.length > 0 && (
+                <div className="rounded-lg border border-slate-100">
+                  <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                    Variants — unique SKU and price per row ({variantRows.length})
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                        <th className="px-3 py-2 font-medium">Variant</th>
+                        <th className="px-3 py-2 font-medium">SKU</th>
+                        <th className="px-3 py-2 font-medium text-right">Price</th>
+                        <th className="px-3 py-2 font-medium text-right">Unit cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variantRows.map((row) => (
+                        <tr key={row.key} className="border-b border-slate-50 last:border-0">
+                          <td className="px-3 py-2 text-slate-600">{row.title}</td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={row.sku}
+                              onChange={(e) => setVariantEdits((prev) => ({ ...prev, [row.key]: { sku: e.target.value, price: row.price, unitCost: row.unitCost } }))}
+                              className="font-mono text-xs"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={row.price}
+                              onChange={(e) => setVariantEdits((prev) => ({ ...prev, [row.key]: { sku: row.sku, price: e.target.value, unitCost: row.unitCost } }))}
+                              className="text-right"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={row.unitCost}
+                              onChange={(e) => setVariantEdits((prev) => ({ ...prev, [row.key]: { sku: row.sku, price: row.price, unitCost: e.target.value } }))}
+                              className="text-right"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <Button type="submit" className="w-full">Create product</Button>
             </FormPanel>
           </form>
 
           <Card className="lg:col-span-2 p-4">
             <div className="mb-3 text-sm font-medium text-slate-700">Vendors ({state.vendors.length})</div>
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {state.vendors.map((v) => (
-                <Badge key={v.id} tone="slate">{v.name} · {v.leadTimeDays}d lead</Badge>
+                <div key={v.id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{v.name}</span>
+                    <Badge tone="slate">{v.leadTimeDays}d lead</Badge>
+                    {v.paymentTerms && <Badge tone="sky">{v.paymentTerms}</Badge>}
+                    {!v.isRecurring && <Badge tone="amber">new vendor</Badge>}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {[v.contactEmail, v.phone].filter(Boolean).join(' · ')}
+                    {v.notes && <span className="block mt-0.5">{v.notes}</span>}
+                  </div>
+                </div>
               ))}
             </div>
           </Card>
+
+          {(state.productMasters.length > 0 || state.products.length > 0) && (
+            <Card className="lg:col-span-2 p-4">
+              <div className="mb-3 text-sm font-medium text-slate-700">Products</div>
+              <div className="space-y-3">
+                {(state.productMasters.length > 0 ? state.productMasters : [{ id: 'demo', title: 'Products', variants: state.products, options: [] }]).map((pm) => (
+                  <div key={pm.id} className="rounded-lg border border-slate-100 px-3 py-2">
+                    <div className="font-medium">{pm.title}</div>
+                    {pm.description && <p className="mt-0.5 text-xs text-slate-500">{pm.description}</p>}
+                    <div className="mt-2 space-y-1">
+                      {pm.variants.map((v) => (
+                        <div key={v.id} className="flex justify-between text-xs text-slate-600">
+                          <span className="font-mono">{v.sku}</span>
+                          <span>${v.price.toFixed(2)} · cost ${v.unitCost.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
@@ -580,14 +758,50 @@ export function Inventory() {
 
       {tab === 'warehouses' && (
         <div className="space-y-4">
-          <form onSubmit={onAddWarehouse} className="max-w-md">
+          <form onSubmit={onAddWarehouse} className="max-w-2xl">
             <FormPanel title="Add warehouse / location">
-              <Field label="Code">
-                <Input value={whCode} onChange={(e) => setWhCode(e.target.value)} placeholder="3PL-WEST" required />
-              </Field>
-              <Field label="Name">
-                <Input value={whName} onChange={(e) => setWhName(e.target.value)} placeholder="West coast 3PL" required />
-              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Code">
+                  <Input value={whCode} onChange={(e) => setWhCode(e.target.value)} placeholder="3PL-WEST" required />
+                </Field>
+                <Field label="Name">
+                  <Input value={whName} onChange={(e) => setWhName(e.target.value)} placeholder="West coast 3PL" required />
+                </Field>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="Contact name">
+                  <Input value={whContactName} onChange={(e) => setWhContactName(e.target.value)} placeholder="Receiving desk" />
+                </Field>
+                <Field label="Contact email">
+                  <Input type="email" value={whContactEmail} onChange={(e) => setWhContactEmail(e.target.value)} placeholder="ops@3pl.com" />
+                </Field>
+                <Field label="Contact phone">
+                  <Input value={whContactPhone} onChange={(e) => setWhContactPhone(e.target.value)} placeholder="+1 732-555-0300" />
+                </Field>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                <div className="mb-2 text-xs font-medium text-slate-500">Address</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Line 1">
+                    <Input value={whAddrLine1} onChange={(e) => setWhAddrLine1(e.target.value)} placeholder="88 Industrial Pkwy" />
+                  </Field>
+                  <Field label="Line 2">
+                    <Input value={whAddrLine2} onChange={(e) => setWhAddrLine2(e.target.value)} placeholder="Unit 4" />
+                  </Field>
+                  <Field label="City">
+                    <Input value={whCity} onChange={(e) => setWhCity(e.target.value)} placeholder="Newark" />
+                  </Field>
+                  <Field label="State / province">
+                    <Input value={whState} onChange={(e) => setWhState(e.target.value)} placeholder="NJ" />
+                  </Field>
+                  <Field label="Postal code">
+                    <Input value={whPostal} onChange={(e) => setWhPostal(e.target.value)} placeholder="07114" />
+                  </Field>
+                  <Field label="Country">
+                    <Input value={whCountry} onChange={(e) => setWhCountry(e.target.value)} placeholder="US" />
+                  </Field>
+                </div>
+              </div>
               <label className="flex items-center gap-2 text-sm text-slate-600">
                 <input type="checkbox" checked={whDefault} onChange={(e) => setWhDefault(e.target.checked)} />
                 Set as default receiving location
@@ -606,6 +820,14 @@ export function Inventory() {
                   <span className="text-sm text-slate-600">{w.name}</span>
                   {w.isDefault && <Badge tone="emerald">default</Badge>}
                 </div>
+                {(w.contactName || w.contactEmail || w.contactPhone) && (
+                  <div className="mt-1 text-xs text-slate-500">
+                    {[w.contactName, w.contactEmail, w.contactPhone].filter(Boolean).join(' · ')}
+                  </div>
+                )}
+                {formatAddress(w.address) && (
+                  <div className="mt-1 text-xs text-slate-500">{formatAddress(w.address)}</div>
+                )}
                 <div className="mt-2 text-xs text-slate-500">
                   {state.stockByWarehouse.filter((s) => s.warehouseId === w.id && s.onHand > 0).length} SKUs with stock
                 </div>
