@@ -21,3 +21,7 @@ services:
         generateValue: true
       - key: ALLOW_DEV_AUTH
         value: "false"
+      - key: API_PUBLIC_URL
+        sync: false
+      - key: SHOPIFY_API_SECRET
+        sync: false
