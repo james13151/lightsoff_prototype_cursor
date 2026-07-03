@@ -1,5 +1,5 @@
 import type {
-  Vendor, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
+  Vendor, Warehouse, StockByWarehouse, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
 } from '../types'
 
@@ -15,10 +15,33 @@ const daysFromNow = (n: number) => {
 }
 
 export const vendors: Vendor[] = [
-  { id: 'v1', name: 'Acme Textiles', leadTimeDays: 12, isRecurring: true },
-  { id: 'v2', name: 'Pacific Trims Co.', leadTimeDays: 8, isRecurring: true },
-  { id: 'v3', name: 'Northwind Packaging', leadTimeDays: 5, isRecurring: true },
-  { id: 'v4', name: 'Kyoto Fabric Lab', leadTimeDays: 21, isRecurring: false },
+  { id: 'v1', name: 'Acme Textiles', leadTimeDays: 12, isRecurring: true, contactEmail: 'orders@acmetextiles.com', phone: '+1 415-555-0101', paymentTerms: 'Net 30' },
+  { id: 'v2', name: 'Pacific Trims Co.', leadTimeDays: 8, isRecurring: true, contactEmail: 'ap@pacifictrims.com', phone: '+1 213-555-0182', paymentTerms: 'Net 15' },
+  { id: 'v3', name: 'Northwind Packaging', leadTimeDays: 5, isRecurring: true, contactEmail: 'billing@northwindpkg.com', phone: '+1 503-555-0144', paymentTerms: 'Due on receipt' },
+  { id: 'v4', name: 'Kyoto Fabric Lab', leadTimeDays: 21, isRecurring: false, contactEmail: 'hello@kyotofabric.jp', phone: '+81 75-555-0199', paymentTerms: '50% deposit, Net 30' },
+]
+
+export const warehouses: Warehouse[] = [
+  {
+    id: 'wh-main', code: 'MAIN', name: 'Main warehouse', isDefault: true,
+    contactName: 'Receiving desk', contactEmail: 'receiving@brand.com', contactPhone: '+1 415-555-0200',
+    address: { line1: '1200 Market St', city: 'San Francisco', state: 'CA', postalCode: '94103', country: 'US' },
+  },
+  {
+    id: 'wh-3pl', code: '3PL-EAST', name: 'East coast 3PL', isDefault: false,
+    contactName: 'Fulfillment ops', contactEmail: 'ops@3pleast.com', contactPhone: '+1 732-555-0300',
+    address: { line1: '88 Industrial Pkwy', line2: 'Unit 4', city: 'Newark', state: 'NJ', postalCode: '07114', country: 'US' },
+  },
+]
+
+export const stockByWarehouse: StockByWarehouse[] = [
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p1', sku: 'HOOD-BLU-M', onHand: 14, reorderPoint: 20 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p2', sku: 'HOOD-BLU-L', onHand: 42, reorderPoint: 20 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p3', sku: 'TEE-RED-S', onHand: 0, reorderPoint: 15 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p4', sku: 'TEE-RED-M', onHand: 8, reorderPoint: 15 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p5', sku: 'CAP-BLK-OS', onHand: 62, reorderPoint: 25 },
+  { warehouseId: 'wh-3pl', warehouseCode: '3PL-EAST', warehouseName: 'East coast 3PL', isDefault: false, variantId: 'p5', sku: 'CAP-BLK-OS', onHand: 35, reorderPoint: 25 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p6', sku: 'TOTE-NAT-OS', onHand: 31, reorderPoint: 10 },
 ]
 
 export const products: Product[] = [
@@ -50,7 +73,8 @@ export const purchaseOrders: PurchaseOrder[] = [
 
 export const receipts: Receipt[] = [
   {
-    id: 'RCV-311', poId: 'PO-1041', vendorId: 'v2', type: 'commercial', createdAt: daysAgo(4),
+    id: 'RCV-311', poId: 'PO-1041', vendorId: 'v2', type: 'commercial', warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse',
+    createdAt: daysAgo(4),
     lines: [{ productId: 'p5', description: 'Black Cap (One Size)', qty: 97 }],
     discrepancy: 'Received 97 of 100 ordered — 3 units short vs PO-1041.',
   },
@@ -62,7 +86,7 @@ export const receipts: Receipt[] = [
 ]
 
 export const ledger: InventoryLedgerEntry[] = [
-  { id: 'il1', productId: 'p5', qtyDelta: 97, reason: 'po_receipt', refId: 'RCV-311', at: daysAgo(4) },
+  { id: 'il1', productId: 'p5', qtyDelta: 97, reason: 'po_receipt', refId: 'RCV-311', at: daysAgo(4), warehouseId: 'wh-main', warehouseCode: 'MAIN', location: 'MAIN' },
   { id: 'il2', productId: 'p1', qtyDelta: -3, reason: 'shopify_sale', refId: 'shopify#5521', at: daysAgo(1) },
   { id: 'il3', productId: 'p3', qtyDelta: -4, reason: 'shopify_sale', refId: 'shopify#5520', at: daysAgo(1) },
   { id: 'il4', productId: 'p4', qtyDelta: -5, reason: 'shopify_sale', refId: 'shopify#5519', at: daysAgo(2) },

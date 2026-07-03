@@ -20,8 +20,8 @@ Minimal Fastify service over the Phase 0 foundation schema. Its defining propert
 | POST | `/v1/inventory-adjustments` | manual stock correction (append-only ledger entry) |
 | GET | `/v1/accounts` | chart of accounts with live balances |
 | GET/POST | `/v1/journal` | journal entries (manual entries balance-checked by the DB) |
-| GET/POST | `/v1/bills` | vendor bills; creation auto-posts expense ← AP to the journal |
-| POST | `/v1/payments` | payment + allocations; auto-posts AP ← Cash, rolls bill status |
+| GET/POST | `/v1/bills` | vendor bill header + line items (PO/receipt linkage); `create_vendor_bill()` |
+| GET/POST | `/v1/payments` | payment + multi-bill partial allocations; auto-posts AP ← Cash |
 | GET/POST | `/v1/expense-claims` | petty-cash claims; `POST /:id/approve` and `/:id/reject` (admin-gated in the DB) |
 | GET | `/v1/finance/summary` | cash, petty cash, AP, revenue, expenses, net profit — straight from the journal |
 

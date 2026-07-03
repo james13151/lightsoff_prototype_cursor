@@ -2,15 +2,51 @@
 
 export type Confidence = number // 0..1
 
+export interface LocationAddress {
+  line1?: string
+  line2?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  country?: string
+}
+
 export interface Vendor {
   id: string
   name: string
   leadTimeDays: number
   isRecurring: boolean
+  contactEmail?: string
+  phone?: string
+  paymentTerms?: string
+  notes?: string
+}
+
+export interface Warehouse {
+  id: string
+  code: string
+  name: string
+  isDefault: boolean
+  contactName?: string
+  contactEmail?: string
+  contactPhone?: string
+  address?: LocationAddress
+}
+
+export interface StockByWarehouse {
+  warehouseId: string
+  warehouseCode: string
+  warehouseName: string
+  isDefault: boolean
+  variantId: string
+  sku: string
+  onHand: number
+  reorderPoint: number
 }
 
 export interface Product {
   id: string
+  productId?: string
   sku: string
   name: string
   stock: number
@@ -19,23 +55,45 @@ export interface Product {
   price: number
   salesVelocityPerDay: number
   shopifySynced: boolean
+  barcode?: string
+  weight?: number
+  weightUnit?: string
+  optionValues?: Record<string, string>
+}
+
+export interface ProductMaster {
+  id: string
+  title: string
+  description?: string
+  brand?: string
+  productType?: string
+  defaultVendorId?: string
+  customAttributes?: Record<string, unknown>
+  options: { id?: string; name: string; values: string[] }[]
+  variants: Product[]
 }
 
 export type POStatus = 'draft' | 'sent' | 'partially_received' | 'received' | 'closed'
 
 export interface POLineItem {
+  id?: string
   productId: string
   qty: number
   unitCost: number
+  receivedQty?: number
+  lineTotal?: number
+  description?: string
 }
 
 export interface PurchaseOrder {
   id: string
+  poNumber?: string
   vendorId: string
   status: POStatus
   lines: POLineItem[]
   createdAt: string
   source: 'ai_capture' | 'ai_reorder' | 'manual'
+  linkedBills?: { id: string; billNumber?: string; amount: number; status: string }[]
 }
 
 export type ReceiptType = 'commercial' | 'sample'
@@ -45,9 +103,13 @@ export interface Receipt {
   poId: string | null
   vendorId: string
   type: ReceiptType
-  lines: { productId: string | null; description: string; qty: number }[]
+  warehouseId?: string
+  warehouseCode?: string
+  warehouseName?: string
+  lines: { id?: string; productId: string | null; description: string; qty: number; poLineItemId?: string }[]
   discrepancy: string | null
   createdAt: string
+  linkedBills?: { id: string; billNumber?: string; amount: number; status: string }[]
 }
 
 export interface InventoryLedgerEntry {
@@ -57,19 +119,57 @@ export interface InventoryLedgerEntry {
   reason: 'po_receipt' | 'shopify_sale' | 'manual_adjustment' | 'sample_receipt'
   refId: string
   at: string
+  warehouseId?: string
+  warehouseCode?: string
+  location?: string
 }
 
 export type BillStatus = 'unpaid' | 'partially_paid' | 'scheduled' | 'paid'
 
+export interface VendorBillLine {
+  id?: string
+  lineNumber?: number
+  productId?: string
+  description?: string
+  qty: number
+  unitCost: number
+  lineAmount: number
+  poLineItemId?: string
+  receiptLineItemId?: string
+}
+
+export interface VendorBillPayment {
+  paymentId: string
+  amount: number
+  paidAt?: string
+  method?: string
+}
+
 export interface VendorBill {
   id: string
   vendorId: string
+  poId?: string
+  receiptId?: string
+  poNumber?: string
+  billNumber?: string
   amount: number
   dueDate: string
   status: BillStatus
   memo: string
   anomaly: string | null
   amountPaid?: number
+  lines?: VendorBillLine[]
+  payments?: VendorBillPayment[]
+}
+
+export interface VendorPayment {
+  id: string
+  vendorId: string
+  amount: number
+  method: string
+  paidAt: string
+  memo?: string
+  allocations: { billId: string; amount: number; billNumber?: string; billStatus?: string }[]
 }
 
 export interface JournalLine {
