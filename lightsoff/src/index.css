@@ -1,13 +1,85 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --color-bg: var(--lo-bg);
+  --color-surface: var(--lo-surface);
+  --color-surface-2: var(--lo-surface-2);
+  --color-ink: var(--lo-ink);
+  --color-ink-muted: var(--lo-ink-muted);
+  --color-ink-faint: var(--lo-ink-faint);
+  --color-line: var(--lo-line);
+  --color-line-subtle: var(--lo-line-subtle);
+  --color-accent: var(--lo-accent);
+  --color-accent-hover: var(--lo-accent-hover);
+  --color-accent-soft: var(--lo-accent-soft);
+  --color-highlight: var(--lo-highlight);
+  --color-highlight-fg: var(--lo-highlight-fg);
+}
+
+/* Light: warm neutrals + bronze accent + charcoal highlights */
+:root {
+  --lo-bg: #e8e8ea;
+  --lo-surface: #f7f7f8;
+  --lo-surface-2: #efeff1;
+  --lo-ink: #1a1a1d;
+  --lo-ink-muted: #52525b;
+  --lo-ink-faint: #71717a;
+  --lo-line: #c8c8cc;
+  --lo-line-subtle: #dddde0;
+  --lo-accent: #b8860b;
+  --lo-accent-hover: #9a7209;
+  --lo-accent-soft: #f5ecd4;
+  --lo-highlight: #3f3f46;
+  --lo-highlight-fg: #fafafa;
+}
+
+/* Dark: charcoal surfaces + gold/bronze accents */
+.dark {
+  --lo-bg: #0e0e10;
+  --lo-surface: #18181b;
+  --lo-surface-2: #222226;
+  --lo-ink: #f4f4f5;
+  --lo-ink-muted: #a1a1aa;
+  --lo-ink-faint: #71717a;
+  --lo-line: #3f3f46;
+  --lo-line-subtle: #2e2e33;
+  --lo-accent: #d4a84b;
+  --lo-accent-hover: #e8bc62;
+  --lo-accent-soft: #2c2618;
+  --lo-highlight: #52525b;
+  --lo-highlight-fg: #fafafa;
 }
 
 html {
   -webkit-font-smoothing: antialiased;
+  background-color: var(--lo-bg);
+  color: var(--lo-ink);
 }
 
 ::selection {
-  background: #c7d2fe;
+  background: color-mix(in srgb, var(--lo-accent) 35%, transparent);
 }
+
+/* Legacy slate utilities used across views — map to theme in dark mode */
+.dark .bg-white { background-color: var(--lo-surface); }
+.dark .bg-slate-50 { background-color: var(--lo-surface-2); }
+.dark .bg-slate-100 { background-color: var(--lo-surface-2); }
+.dark .border-slate-100 { border-color: var(--lo-line-subtle); }
+.dark .border-slate-200 { border-color: var(--lo-line); }
+.dark .text-slate-900 { color: var(--lo-ink); }
+.dark .text-slate-800 { color: var(--lo-ink); }
+.dark .text-slate-700 { color: var(--lo-ink-muted); }
+.dark .text-slate-600 { color: var(--lo-ink-muted); }
+.dark .text-slate-500 { color: var(--lo-ink-faint); }
+.dark .text-slate-400 { color: var(--lo-ink-faint); }
+.dark .hover\:bg-slate-50:hover { background-color: var(--lo-surface-2); }
+.dark .hover\:bg-slate-100:hover { background-color: var(--lo-surface-2); }
+.dark .hover\:bg-slate-50\/50:hover { background-color: color-mix(in srgb, var(--lo-surface-2) 50%, transparent); }
+.dark .bg-slate-50\/80 { background-color: color-mix(in srgb, var(--lo-surface-2) 80%, transparent); }
+.dark .bg-white\/90 { background-color: color-mix(in srgb, var(--lo-surface) 90%, transparent); }
+.dark .bg-indigo-50\/60 { background-color: var(--lo-accent-soft); }
+.dark .border-indigo-200 { border-color: color-mix(in srgb, var(--lo-accent) 35%, transparent); }

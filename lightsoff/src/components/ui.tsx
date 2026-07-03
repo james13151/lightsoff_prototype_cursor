@@ -3,31 +3,32 @@ import type { Confidence } from '../types'
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</div>
+    <div className={`rounded-xl border border-line bg-surface shadow-sm ${className}`}>{children}</div>
   )
 }
 
 export function SectionTitle({ children, sub }: { children: ReactNode; sub?: string }) {
   return (
     <div className="mb-4">
-      <h2 className="text-lg font-semibold text-slate-900">{children}</h2>
-      {sub && <p className="mt-0.5 text-sm text-slate-500">{sub}</p>}
+      <h2 className="text-lg font-semibold text-ink">{children}</h2>
+      {sub && <p className="mt-0.5 text-sm text-ink-muted">{sub}</p>}
     </div>
   )
 }
 
 export function Badge({ children, tone = 'slate' }: { children: ReactNode; tone?: string }) {
   const tones: Record<string, string> = {
-    slate: 'bg-slate-100 text-slate-700',
-    sky: 'bg-sky-100 text-sky-700',
-    emerald: 'bg-emerald-100 text-emerald-700',
-    rose: 'bg-rose-100 text-rose-700',
-    amber: 'bg-amber-100 text-amber-800',
-    violet: 'bg-violet-100 text-violet-700',
-    indigo: 'bg-indigo-100 text-indigo-700',
+    slate: 'bg-surface-2 text-ink-muted',
+    sky: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300',
+    emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+    rose: 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300',
+    amber: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+    violet: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
+    indigo: 'bg-accent-soft text-accent',
+    accent: 'bg-accent-soft text-accent',
   }
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${tones[tone] ?? tones.slate}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ring-black/5 dark:ring-white/10 ${tones[tone] ?? tones.slate}`}>
       {children}
     </span>
   )
@@ -40,7 +41,7 @@ export function ConfidenceBadge({ value, threshold }: { value: Confidence; thres
     <span className="inline-flex items-center gap-1.5">
       <Badge tone={tone}>AI {pct}%</Badge>
       {threshold !== undefined && (
-        <span className="text-[11px] text-slate-400">
+        <span className="text-[11px] text-ink-faint">
           {value >= threshold ? 'above' : 'below'} your {Math.round(threshold * 100)}% auto-apply threshold
         </span>
       )}
@@ -66,9 +67,9 @@ export function Button({
   type?: 'button' | 'submit' | 'reset'
 }) {
   const variants = {
-    primary: 'bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-50',
-    secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50',
-    ghost: 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50',
+    primary: 'bg-accent text-white hover:bg-accent-hover disabled:opacity-50 shadow-sm',
+    secondary: 'border border-line bg-surface text-ink-muted hover:bg-highlight hover:text-highlight-fg disabled:opacity-50',
+    ghost: 'text-ink-faint hover:bg-highlight hover:text-highlight-fg disabled:opacity-50',
     danger: 'bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50',
   }
   return (
@@ -84,12 +85,12 @@ export function Button({
   )
 }
 
-export function Stat({ label, value, sub, tone = 'text-slate-900' }: { label: string; value: string; sub?: string; tone?: string }) {
+export function Stat({ label, value, sub, tone = 'text-ink' }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
     <Card className="p-4">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${tone}`}>{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-slate-500">{sub}</div>}
+      {sub && <div className="mt-0.5 text-xs text-ink-muted">{sub}</div>}
     </Card>
   )
 }
@@ -108,7 +109,7 @@ export function timeAgo(iso: string): string {
 export function FormPanel({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
   return (
     <div className={`space-y-2.5 ${className}`}>
-      {title ? <h3 className="text-sm font-semibold text-slate-800">{title}</h3> : null}
+      {title ? <h3 className="text-sm font-semibold text-ink">{title}</h3> : null}
       <div className="space-y-2.5">{children}</div>
     </div>
   )
@@ -117,14 +118,14 @@ export function FormPanel({ title, children, className = '' }: { title: string; 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-ink-muted">{label}</span>
       {children}
     </label>
   )
 }
 
 const inputClass =
-  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300'
+  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30'
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${inputClass} ${props.className ?? ''}`} />
@@ -150,7 +151,7 @@ export function SubTabs<T extends string>({
   action?: ReactNode
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 pb-px">
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-2 border-b border-line pb-px">
       <div className="flex flex-wrap gap-1">
         {tabs.map((tab) => (
           <button
@@ -159,8 +160,8 @@ export function SubTabs<T extends string>({
             onClick={() => onChange(tab.id)}
             className={`rounded-t-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               active === tab.id
-                ? 'border border-b-white border-slate-200 bg-white text-slate-900 -mb-px'
-                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                ? 'border border-b-surface border-line bg-surface text-ink -mb-px'
+                : 'text-ink-muted hover:bg-highlight hover:text-highlight-fg'
             }`}
           >
             {tab.label}
@@ -187,16 +188,16 @@ export function Modal({
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[10vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 pt-[10vh]" onClick={onClose}>
       <div
-        className={`w-full rounded-xl border border-slate-200 bg-white p-4 shadow-xl ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
+        className={`w-full rounded-xl border border-line bg-surface p-4 shadow-xl ${wide ? 'max-w-2xl' : 'max-w-lg'}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 id="modal-title" className="text-sm font-semibold text-slate-900">{title}</h2>
+          <h2 id="modal-title" className="text-sm font-semibold text-ink">{title}</h2>
           <Button variant="ghost" onClick={onClose} title="Close">×</Button>
         </div>
         {children}
@@ -244,7 +245,7 @@ export function ListToolbar({
       <SearchInput value={search} onChange={onSearchChange} placeholder={placeholder} />
       {filters}
       {count !== undefined && (
-        <span className="ml-auto text-xs text-slate-400">{count} shown</span>
+        <span className="ml-auto text-xs text-ink-faint">{count} shown</span>
       )}
     </div>
   )
@@ -253,6 +254,6 @@ export function ListToolbar({
 /** Compact row list item */
 export function ListRow({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-lg border border-slate-100 px-2.5 py-2 text-sm ${className}`}>{children}</div>
+    <div className={`rounded-lg border border-line-subtle px-2.5 py-2 text-sm ${className}`}>{children}</div>
   )
 }
