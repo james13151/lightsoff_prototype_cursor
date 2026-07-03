@@ -1,0 +1,227 @@
+{
+  "version": "module1-live-test-v0.1",
+  "app_id": "6a1fcff6f516dd811c7315c7",
+  "principles": [
+    "Provider credentials live only in Base44 Dashboard Secrets.",
+    "Use published HTTPS Base44 function URLs, never localhost or the Base44 editor preview URL.",
+    "A channel is connected only after provider send/API readiness and real inbound webhook evidence both exist.",
+    "AI is draft-only; every outbound send must use an approved AiDraft."
+  ],
+  "global_gates": [
+    {
+      "id": "base44-plan",
+      "label": "Confirm Base44 Builder plan or higher",
+      "evidence": "Backend functions and external APIs are available in the Base44 app."
+    },
+    {
+      "id": "repo-check",
+      "label": "Run npm run check before publish",
+      "command": "npm run check",
+      "evidence": "Lint, typecheck, generated functions, preflight, fixture, flow, and build checks pass."
+    },
+    {
+      "id": "publish",
+      "label": "Publish current branch to Base44",
+      "evidence": "Published app opens and the Omnichannel Setup page is visible to an admin."
+    },
+    {
+      "id": "local-env",
+      "label": "Configure local .env.local with the published function base",
+      "command": "npm run local:env:check",
+      "evidence": "Local Base44 env looks ready."
+    }
+  ],
+  "channels": [
+    {
+      "type": "email",
+      "label": "Email / Postmark",
+      "webhook_function": "receivePostmarkInbound",
+      "required_secrets": [
+        "POSTMARK_SERVER_TOKEN",
+        "POSTMARK_FROM_EMAIL",
+        "POSTMARK_INBOUND_WEBHOOK_SECRET"
+      ],
+      "optional_secrets": [
+        "POSTMARK_MESSAGE_STREAM"
+      ],
+      "provider_setup": [
+        "Create or choose a Postmark Server.",
+        "Enable inbound processing.",
+        "Add the generated Email webhook URL and append ?secret=<POSTMARK_INBOUND_WEBHOOK_SECRET>.",
+        "Forward the support inbox to the Postmark inbound address if using forwarding."
+      ],
+      "connector_test": [
+        "Open Omnichannel Setup as admin.",
+        "Enter a real test recipient email.",
+        "Run Test connector for Email.",
+        "Confirm the Email card becomes Send ready, not Connected yet unless inbound has already arrived."
+      ],
+      "inbound_test": [
+        "Send a real email into Postmark inbound.",
+        "Confirm a Ticket, ConversationMessage, channel_message timeline entry, and AiDraft are created.",
+        "Confirm Email card reaches Connected after send readiness plus inbound evidence."
+      ],
+      "outbound_test": [
+        "Open the created ticket.",
+        "Edit the AI draft if needed.",
+        "Approve + Send.",
+        "Confirm Postmark sends the email and the ticket timeline shows send_attempt with send_status=sent."
+      ],
+      "fixture": {
+        "provider": "postmark",
+        "env": "POSTMARK_INBOUND_WEBHOOK_SECRET",
+        "path": "fixtures/module1/postmark-inbound.json"
+      }
+    },
+    {
+      "type": "facebook",
+      "label": "Facebook Messenger",
+      "webhook_function": "receiveMetaWebhook",
+      "webhook_query": "channel=facebook",
+      "verify": {
+        "provider": "meta",
+        "env": "META_VERIFY_TOKEN"
+      },
+      "required_secrets": [
+        "META_PAGE_ACCESS_TOKEN",
+        "META_PAGE_ID",
+        "META_VERIFY_TOKEN",
+        "META_APP_SECRET"
+      ],
+      "provider_setup": [
+        "Connect the Meta app to the target Facebook Page.",
+        "Configure Messenger/Page messaging permissions.",
+        "Set the generated Facebook callback URL in Meta Webhooks.",
+        "Use META_VERIFY_TOKEN as the webhook verification token.",
+        "Subscribe the Page to message events."
+      ],
+      "connector_test": [
+        "Run Test connector for Facebook Messenger.",
+        "Confirm Meta credential lookup passes.",
+        "Confirm the Facebook card becomes Send ready until a real inbound message arrives."
+      ],
+      "inbound_test": [
+        "Send a real Page message to the business Page.",
+        "Confirm a Ticket, ConversationMessage, channel_message timeline entry, and AiDraft are created.",
+        "Confirm Facebook card reaches Connected after send readiness plus inbound evidence."
+      ],
+      "outbound_test": [
+        "Open the created ticket.",
+        "Approve + Send from the AI draft panel.",
+        "Confirm Meta sends the reply and the ticket timeline shows send_attempt with send_status=sent."
+      ],
+      "fixture": {
+        "provider": "meta",
+        "env": "META_APP_SECRET",
+        "path": "fixtures/module1/meta-facebook-message.json"
+      }
+    },
+    {
+      "type": "instagram",
+      "label": "Instagram Messaging",
+      "webhook_function": "receiveMetaWebhook",
+      "webhook_query": "channel=instagram",
+      "verify": {
+        "provider": "meta",
+        "env": "META_VERIFY_TOKEN"
+      },
+      "required_secrets": [
+        "META_PAGE_ACCESS_TOKEN",
+        "META_INSTAGRAM_ACCOUNT_ID",
+        "META_VERIFY_TOKEN",
+        "META_APP_SECRET"
+      ],
+      "provider_setup": [
+        "Use an Instagram professional account connected to the Meta app/Page.",
+        "Confirm Instagram Messaging permissions/review status.",
+        "Set the generated Instagram callback URL in Meta Webhooks.",
+        "Use META_VERIFY_TOKEN as the webhook verification token.",
+        "Subscribe Instagram message events."
+      ],
+      "connector_test": [
+        "Run Test connector for Instagram.",
+        "Confirm Meta credential lookup passes for META_INSTAGRAM_ACCOUNT_ID.",
+        "Confirm the Instagram card becomes Send ready until a real inbound message arrives."
+      ],
+      "inbound_test": [
+        "Send a real Instagram DM to the business account.",
+        "Confirm a Ticket, ConversationMessage, channel_message timeline entry, and AiDraft are created.",
+        "Confirm the ticket preserves channel_type=instagram and shows the Instagram badge."
+      ],
+      "outbound_test": [
+        "Open the created ticket.",
+        "Approve + Send from the AI draft panel.",
+        "Confirm the reply sends through the Instagram account node and the ticket timeline shows send_attempt with send_status=sent."
+      ],
+      "fixture": {
+        "provider": "meta",
+        "env": "META_APP_SECRET",
+        "path": "fixtures/module1/meta-instagram-message.json"
+      }
+    },
+    {
+      "type": "whatsapp",
+      "label": "WhatsApp Cloud API",
+      "webhook_function": "receiveWhatsAppWebhook",
+      "verify": {
+        "provider": "whatsapp",
+        "env": "WHATSAPP_VERIFY_TOKEN"
+      },
+      "required_secrets": [
+        "WHATSAPP_ACCESS_TOKEN",
+        "WHATSAPP_PHONE_NUMBER_ID",
+        "WHATSAPP_VERIFY_TOKEN",
+        "META_APP_SECRET"
+      ],
+      "provider_setup": [
+        "Configure the WhatsApp Cloud API phone number.",
+        "Set the generated WhatsApp callback URL in Meta/WhatsApp Webhooks.",
+        "Use WHATSAPP_VERIFY_TOKEN as the webhook verification token.",
+        "Subscribe to message events."
+      ],
+      "connector_test": [
+        "Run Test connector for WhatsApp.",
+        "Confirm phone-number lookup passes.",
+        "Confirm the WhatsApp card becomes Send ready until a real inbound message arrives."
+      ],
+      "inbound_test": [
+        "Send a real WhatsApp message to the business number.",
+        "Confirm a Ticket, ConversationMessage, channel_message timeline entry, and AiDraft are created.",
+        "Confirm WhatsApp card reaches Connected after send readiness plus inbound evidence."
+      ],
+      "outbound_test": [
+        "Reply inside the 24-hour service window and confirm send_status=sent.",
+        "For outside-window replies, enter an approved template name/language code.",
+        "Confirm free-form outside-window sends are blocked with send_status=blocked."
+      ],
+      "fixture": {
+        "provider": "whatsapp",
+        "env": "META_APP_SECRET",
+        "path": "fixtures/module1/whatsapp-message.json"
+      }
+    }
+  ],
+  "negative_tests": [
+    {
+      "id": "meta-ignored-events",
+      "label": "Meta echo/delivery/read events are ignored",
+      "fixture": {
+        "provider": "meta",
+        "env": "META_APP_SECRET",
+        "path": "fixtures/module1/meta-facebook-ignored-events.json",
+        "channel_type": "facebook"
+      },
+      "expected": "processed: 0 and no Ticket created"
+    },
+    {
+      "id": "supplier-partner-gate",
+      "label": "Supplier/partner users cannot access ticket/customer channel cockpit",
+      "expected": "No Omnichannel Setup nav and backend draft/send/setup functions return 403"
+    },
+    {
+      "id": "direct-body-send",
+      "label": "Direct body-only sends are rejected",
+      "expected": "Backend send function returns an error requiring approved ai_draft_id"
+    }
+  ]
+}

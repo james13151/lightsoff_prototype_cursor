@@ -1,0 +1,21 @@
+{
+  "name": "Memo",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "\u5907\u5fd8\u5f55\u6807\u9898"
+    },
+    "content": {
+      "type": "string",
+      "description": "\u5907\u5fd8\u5f55\u5185\u5bb9"
+    },
+    "owner_id": {
+      "type": "string",
+      "description": "\u6240\u6709\u8005\u7528\u6237ID"
+    }
+  },
+  "required": [
+    "title"
+  ]
+}

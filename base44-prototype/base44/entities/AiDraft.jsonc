@@ -1,0 +1,104 @@
+{
+  "name": "AiDraft",
+  "type": "object",
+  "properties": {
+    "ticket_id": {
+      "type": "string",
+      "description": "Linked Ticket id"
+    },
+    "conversation_message_id": {
+      "type": "string",
+      "description": "Linked inbound ConversationMessage id"
+    },
+    "channel_type": {
+      "type": "string",
+      "enum": [
+        "email",
+        "facebook",
+        "instagram",
+        "whatsapp"
+      ],
+      "description": "Draft channel"
+    },
+    "summary": {
+      "type": "string",
+      "description": "AI conversation summary"
+    },
+    "intent": {
+      "type": "string",
+      "description": "AI-detected intent"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "blocked"
+      ],
+      "default": "medium",
+      "description": "AI risk classification"
+    },
+    "recommended_action": {
+      "type": "string",
+      "description": "Recommended next action"
+    },
+    "draft_text": {
+      "type": "string",
+      "description": "Draft reply text"
+    },
+    "missing_info": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Facts needed before sending"
+    },
+    "approval_state": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "edited",
+        "approved",
+        "sent",
+        "discarded",
+        "blocked"
+      ],
+      "default": "draft",
+      "description": "Draft approval state"
+    },
+    "edited_text": {
+      "type": "string",
+      "description": "Human-edited draft text"
+    },
+    "approved_by_id": {
+      "type": "string",
+      "description": "Approving user id"
+    },
+    "approved_by_name": {
+      "type": "string",
+      "description": "Approving user name"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Approval timestamp"
+    },
+    "send_policy_state": {
+      "type": "string",
+      "description": "Latest send policy result"
+    },
+    "model_name": {
+      "type": "string",
+      "description": "AI model/provider used"
+    },
+    "prompt_version": {
+      "type": "string",
+      "description": "Prompt version"
+    }
+  },
+  "required": [
+    "ticket_id",
+    "draft_text"
+  ]
+}

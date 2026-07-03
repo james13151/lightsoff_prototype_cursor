@@ -1,0 +1,39 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "demo-whatsapp-business-account",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15551230000",
+              "phone_number_id": "demo-phone-number-id"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Demo WhatsApp Customer"
+                },
+                "wa_id": "15551234567"
+              }
+            ],
+            "messages": [
+              {
+                "from": "15551234567",
+                "id": "demo-whatsapp-message-001",
+                "timestamp": "1710000000",
+                "text": {
+                  "body": "The item arrived broken. I can send photos. Please help."
+                },
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Scheme A — dark navy sidebar + light content area */
+    --background: 220 14% 96%;         /* #F4F5F7 content bg */
+    --foreground: 228 20% 14%;         /* #1A1E28 */
+    --card: 0 0% 100%;                 /* #FFFFFF */
+    --card-foreground: 228 20% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 228 20% 14%;
+    --primary: 42 70% 44%;             /* #C49A1A darker gold for light bg */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 25% 38%;          /* #4A5B7A button fill */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 228 20% 40%;   /* rgba(26,30,40,0.65) approx */
+    --accent: 42 70% 44%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 228 20% 14%;             /* base — opacity applied via overrides */
+    --input: 0 0% 100%;
+    --ring: 42 70% 44%;
+    --chart-1: 42 70% 44%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --radius: 0.5rem;
+    --font-heading: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-display: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    /* Sidebar tokens (dark navy) */
+    --sidebar-background: 225 22% 18%; /* #1E2433 */
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 43 61% 52%;     /* #D4AF37 gold for dark sidebar */
+    --sidebar-primary-foreground: 225 22% 18%;
+    --sidebar-accent: 225 22% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 100%;
+    --sidebar-ring: 43 61% 52%;
+    /* Custom tokens */
+    --gold-sidebar: #D4AF37;           /* gold on dark sidebar */
+    --gold-content: #C49A1A;           /* darker gold on light content */
+    --gold: #C49A1A;
+    --bg-page: #F4F5F7;
+    --bg-card: #FFFFFF;
+    --bg-sidebar: #1E2433;
+    --bg-hover-sidebar: rgba(255,255,255,0.06);
+    --border-light: rgba(0,0,0,0.08);
+    --border-light-hover: rgba(0,0,0,0.15);
+    --border-sidebar: rgba(255,255,255,0.08);
+    --text-primary-content: #1A1E28;
+    --text-secondary-content: rgba(26,30,40,0.65);
+    --text-tertiary-content: rgba(26,30,40,0.40);
+    --text-hint: rgba(26,30,40,0.40);
+  }
+
+  /* .dark mirrors :root for Scheme A (no separate dark mode) */
+  .dark {
+    --background: 220 14% 96%;
+    --foreground: 228 20% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 228 20% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 228 20% 14%;
+    --primary: 42 70% 44%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 25% 38%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 228 20% 40%;
+    --accent: 42 70% 44%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 228 20% 14%;
+    --input: 0 0% 100%;
+    --ring: 42 70% 44%;
+    --chart-1: 42 70% 44%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 225 22% 18%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 43 61% 52%;
+    --sidebar-primary-foreground: 225 22% 18%;
+    --sidebar-accent: 225 22% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 100%;
+    --sidebar-ring: 43 61% 52%;
+    --gold-sidebar: #D4AF37;
+    --gold-content: #C49A1A;
+    --gold: #C49A1A;
+    --bg-page: #F4F5F7;
+    --bg-card: #FFFFFF;
+    --bg-sidebar: #1E2433;
+    --bg-hover-sidebar: rgba(255,255,255,0.06);
+    --border-light: rgba(0,0,0,0.08);
+    --border-light-hover: rgba(0,0,0,0.15);
+    --border-sidebar: rgba(255,255,255,0.08);
+    --text-primary-content: #1A1E28;
+    --text-secondary-content: rgba(26,30,40,0.65);
+    --text-tertiary-content: rgba(26,30,40,0.40);
+    --text-hint: rgba(26,30,40,0.40);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    background-color: #F4F5F7;
+    color: #1A1E28;
+  }
+}
+
+/* ── Global font-size scale ──────────────────── */
+
+/* Desktop base (≥1024px) */
+@media (min-width: 1024px) {
+  body { font-size: 14px; }
+
+  /* Secondary / muted text */
+  .text-muted-foreground { font-size: 13px; }
+
+  /* Navigation items */
+  nav a, nav button, .nav-item { font-size: 14px; }
+
+  /* Buttons */
+  .btn, button[class*="inline-flex"] { font-size: 14px; }
+
+  /* Inputs */
+  input, textarea, select { font-size: 14px; }
+
+  /* Table cells */
+  td, th { font-size: 13px; }
+}
+
+/* ── Mobile overrides (≤767px) ────────────────── */
+@media (max-width: 767px) {
+  body { font-size: 16px; }
+
+  /* Scale up all hard-coded text-[Xpx] tokens */
+  .text-\[9px\]   { font-size: 11px !important; }
+  .text-\[10px\]  { font-size: 12px !important; }
+  .text-\[11px\]  { font-size: 12px !important; }
+  .text-\[12px\]  { font-size: 13px !important; }
+  .text-\[13px\]  { font-size: 14px !important; }
+  .text-\[14px\]  { font-size: 16px !important; }
+  .text-\[15px\]  { font-size: 17px !important; }
+  .text-\[16px\]  { font-size: 16px !important; }
+  .text-\[18px\]  { font-size: 20px !important; }
+  .text-\[22px\]  { font-size: 22px !important; }
+
+  /* Inputs — 16px prevents iOS auto-zoom */
+  input, textarea, select { font-size: 16px !important; }
+
+  /* Bottom tab bar labels */
+  .bottom-tab-label { font-size: 12px !important; }
+}
+
+/* Custom thin borders */
+.border-thin {
+  border-width: 0.5px;
+}
+
+/* Border overrides — light content area */
+.border-border, [class*="border-border"] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+.hover\:border-border:hover {
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Hide scrollbar for horizontal chip rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

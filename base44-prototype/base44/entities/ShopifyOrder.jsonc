@@ -1,0 +1,73 @@
+{
+  "name": "ShopifyOrder",
+  "type": "object",
+  "properties": {
+    "shopify_order_id": {
+      "type": "string",
+      "description": "Shopify\u539f\u59cb\u8ba2\u5355ID"
+    },
+    "order_number": {
+      "type": "string",
+      "description": "Shopify\u8ba2\u5355\u53f7 (e.g. #1001)"
+    },
+    "shopify_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Shopify\u8ba2\u5355\u521b\u5efa\u65f6\u95f4"
+    },
+    "customer_name": {
+      "type": "string",
+      "description": "\u5ba2\u6237\u59d3\u540d"
+    },
+    "customer_email": {
+      "type": "string",
+      "description": "\u5ba2\u6237\u90ae\u7bb1"
+    },
+    "shipping_address": {
+      "type": "string",
+      "description": "\u6536\u8d27\u5730\u5740\uff08\u5b8c\u6574\uff09"
+    },
+    "total_price": {
+      "type": "number",
+      "default": 0,
+      "description": "\u8ba2\u5355\u603b\u91d1\u989d\uff08USD\uff09"
+    },
+    "currency": {
+      "type": "string",
+      "default": "USD",
+      "description": "\u8d27\u5e01"
+    },
+    "financial_status": {
+      "type": "string",
+      "description": "Shopify\u4ed8\u6b3e\u72b6\u6001 (paid/pending/refunded\u7b49)"
+    },
+    "fulfillment_status": {
+      "type": "string",
+      "enum": [
+        "unfulfilled",
+        "partial",
+        "fulfilled",
+        "cancelled"
+      ],
+      "default": "unfulfilled",
+      "description": "\u6574\u4f53\u5c65\u7ea6\u72b6\u6001"
+    },
+    "tags": {
+      "type": "string",
+      "description": "Shopify\u8ba2\u5355\u6807\u7b7e"
+    },
+    "notes": {
+      "type": "string",
+      "description": "\u8ba2\u5355\u5907\u6ce8"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u6700\u8fd1\u540c\u6b65\u65f6\u95f4"
+    }
+  },
+  "required": [
+    "shopify_order_id",
+    "order_number"
+  ]
+}

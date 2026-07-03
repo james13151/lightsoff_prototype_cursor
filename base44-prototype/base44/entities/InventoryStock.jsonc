@@ -1,0 +1,39 @@
+{
+  "name": "InventoryStock",
+  "type": "object",
+  "properties": {
+    "sku_ref": {
+      "type": "string",
+      "description": "\u5173\u8054\u4ea7\u54c1ID"
+    },
+    "sku_id": {
+      "type": "string",
+      "description": "SKU\u7f16\u53f7(\u5197\u4f59)"
+    },
+    "sku_name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0(\u5197\u4f59)"
+    },
+    "warehouse": {
+      "type": "string",
+      "enum": [
+        "\u4e0a\u6d77\u4ed3",
+        "Tucson\u4ed3"
+      ],
+      "description": "\u4ed3\u5e93"
+    },
+    "quantity": {
+      "type": "number",
+      "default": 0,
+      "description": "\u5f53\u524d\u5e93\u5b58\u6570\u91cf"
+    },
+    "warehouse_location": {
+      "type": "string",
+      "description": "\u4ed3\u4f4d\u53f7"
+    }
+  },
+  "required": [
+    "sku_ref",
+    "warehouse"
+  ]
+}

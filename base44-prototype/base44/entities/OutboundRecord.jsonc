@@ -1,0 +1,104 @@
+{
+  "name": "OutboundRecord",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u51fa\u5e93\u65e5\u671f"
+    },
+    "sku_ref": {
+      "type": "string",
+      "description": "SKU\u4ea7\u54c1ID"
+    },
+    "sku_name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0(\u5197\u4f59)"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "\u6570\u91cf"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "\u9500\u552e\u51fa\u5e93",
+        "\u9000\u8d27\u51fa\u5e93",
+        "\u8c03\u62e8\u51fa\u5e93"
+      ],
+      "description": "\u51fa\u5e93\u7c7b\u578b"
+    },
+    "warehouse": {
+      "type": "string",
+      "enum": [
+        "\u4e0a\u6d77\u4ed3",
+        "Tucson\u4ed3"
+      ],
+      "description": "\u4ed3\u5e93"
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "\u64cd\u4f5c\u5458ID"
+    },
+    "operator_name": {
+      "type": "string",
+      "description": "\u64cd\u4f5c\u5458\u59d3\u540d(\u5197\u4f59)"
+    },
+    "order_number": {
+      "type": "string",
+      "description": "\u8ba2\u5355\u53f7"
+    },
+    "notes": {
+      "type": "string",
+      "description": "\u5907\u6ce8"
+    },
+    "linked_ticket_id": {
+      "type": "string",
+      "description": "\u5173\u8054\u5de5\u5355ID"
+    },
+    "shopify_order_ref": {
+      "type": "string",
+      "description": "\u5173\u8054ShopifyOrder\u672c\u5730ID"
+    },
+    "shopify_order_line_ref": {
+      "type": "string",
+      "description": "\u5173\u8054ShopifyOrderLine\u672c\u5730ID"
+    },
+    "recipient_name": {
+      "type": "string",
+      "description": "\u6536\u8d27\u4eba"
+    },
+    "recipient_address": {
+      "type": "string",
+      "description": "\u6536\u8d27\u5730\u5740"
+    },
+    "recipient_contact": {
+      "type": "string",
+      "description": "\u8054\u7cfb\u65b9\u5f0f"
+    },
+    "carrier": {
+      "type": "string",
+      "description": "\u7269\u6d41\u5546 (USPS/UPS/FedEx)"
+    },
+    "tracking_number": {
+      "type": "string",
+      "description": "\u8fd0\u5355\u53f7"
+    },
+    "fulfillment_status": {
+      "type": "string",
+      "enum": [
+        "\u5f85\u51fa\u5e93",
+        "\u51fa\u5e93\u4e2d",
+        "\u5df2\u53d1\u8d27"
+      ],
+      "default": "\u5f85\u51fa\u5e93",
+      "description": "\u5c65\u7ea6\u72b6\u6001"
+    }
+  },
+  "required": [
+    "date",
+    "sku_ref",
+    "quantity",
+    "type"
+  ]
+}

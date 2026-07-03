@@ -1,0 +1,21 @@
+{
+  "From": "customer@example.com",
+  "FromName": "Demo Customer",
+  "FromFull": {
+    "Email": "customer@example.com",
+    "Name": "Demo Customer"
+  },
+  "OriginalRecipient": "support@example.com",
+  "MessageID": "demo-postmark-message-001",
+  "Subject": "Cancel my order before it ships",
+  "TextBody": "Hi, I need to cancel my order before it ships. Can you confirm if it has already been picked?",
+  "StrippedTextReply": "Hi, I need to cancel my order before it ships.",
+  "HtmlBody": "<p>Hi, I need to cancel my order before it ships.</p>",
+  "Headers": [
+    {
+      "Name": "Message-ID",
+      "Value": "<demo-postmark-message-001@example.com>"
+    }
+  ],
+  "Attachments": []
+}

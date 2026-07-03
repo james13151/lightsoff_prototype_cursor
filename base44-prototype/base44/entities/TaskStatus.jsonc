@@ -1,0 +1,36 @@
+{
+  "name": "TaskStatus",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "\u72b6\u6001\u540d\u79f0"
+    },
+    "color": {
+      "type": "string",
+      "description": "\u989c\u8272\uff08hex\uff09",
+      "default": "#9E9E9E"
+    },
+    "order": {
+      "type": "number",
+      "default": 0,
+      "description": "\u6392\u5e8f\u5e8f\u53f7"
+    },
+    "default_assignee_id": {
+      "type": "string",
+      "description": "\u9ed8\u8ba4\u8d1f\u8d23\u4ebaID"
+    },
+    "default_assignee_name": {
+      "type": "string",
+      "description": "\u9ed8\u8ba4\u8d1f\u8d23\u4eba\u59d3\u540d"
+    },
+    "is_completion_status": {
+      "type": "boolean",
+      "default": false,
+      "description": "\u662f\u5426\u4e3a\u5b8c\u6210\u72b6\u6001\uff08\u7528\u4e8e\u8fdb\u5ea6\u8ba1\u7b97\uff09"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

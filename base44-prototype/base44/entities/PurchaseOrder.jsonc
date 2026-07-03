@@ -1,0 +1,108 @@
+{
+  "name": "PurchaseOrder",
+  "type": "object",
+  "properties": {
+    "po_number": {
+      "type": "string",
+      "description": "\u91c7\u8d2d\u5355\u53f7(\u81ea\u52a8)"
+    },
+    "supplier_name": {
+      "type": "string",
+      "description": "\u4f9b\u5e94\u5546\u540d\u79f0"
+    },
+    "vehicle_model": {
+      "type": "string",
+      "description": "\u8f66\u578b"
+    },
+    "other_notes": {
+      "type": "string",
+      "description": "\u5176\u4ed6\u5907\u6ce8"
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "\u521b\u5efa\u4ebaID"
+    },
+    "operator_name": {
+      "type": "string",
+      "description": "\u521b\u5efa\u4eba\u59d3\u540d"
+    },
+    "production_status": {
+      "type": "string",
+      "enum": [
+        "\u8349\u7a3f",
+        "\u5f85\u4f9b\u5e94\u5546\u786e\u8ba4",
+        "\u751f\u4ea7\u4e2d",
+        "\u5df2\u53d1\u8d27",
+        "\u5df2\u6536\u8d27",
+        "\u5df2\u53d6\u6d88"
+      ],
+      "default": "\u8349\u7a3f",
+      "description": "\u751f\u4ea7\u72b6\u6001"
+    },
+    "receipt_status": {
+      "type": "string",
+      "enum": [
+        "\u672a\u6536\u8d27",
+        "\u90e8\u5206\u6536\u8d27",
+        "\u6536\u8d27\u5b8c\u6210",
+        "\u5173\u95ed"
+      ],
+      "default": "\u672a\u6536\u8d27",
+      "description": "\u6536\u8d27\u72b6\u6001"
+    },
+    "receiving_warehouse": {
+      "type": "string",
+      "enum": [
+        "\u4e0a\u6d77\u4ed3",
+        "Tucson\u4ed3"
+      ],
+      "description": "\u6536\u8d27\u4ed3\u5e93"
+    },
+    "expected_ship_date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u9884\u8ba1\u53d1\u8d27\u65e5\u671f"
+    },
+    "actual_arrival_date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u5b9e\u9645\u5230\u8d27\u65e5\u671f"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "\u672a\u7ed3\u7b97",
+        "\u90e8\u5206\u7ed3\u7b97",
+        "\u5df2\u7ed3\u7b97"
+      ],
+      "default": "\u672a\u7ed3\u7b97",
+      "description": "\u7ed3\u7b97\u72b6\u6001"
+    },
+    "linked_ticket": {
+      "type": "string",
+      "description": "\u5173\u8054\u5de5\u5355ID"
+    },
+    "total_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "\u603b\u91d1\u989d(\u81ea\u52a8\u6c47\u603b)"
+    },
+    "is_archived": {
+      "type": "boolean",
+      "default": false,
+      "description": "\u662f\u5426\u5df2\u5f52\u6863"
+    },
+    "archive_reason": {
+      "type": "string",
+      "enum": [
+        "\u5df2\u7ed3\u7b97",
+        "\u5df2\u53d6\u6d88",
+        "\u624b\u52a8\u5f52\u6863"
+      ],
+      "description": "\u5f52\u6863\u539f\u56e0"
+    }
+  },
+  "required": [
+    "supplier_name"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "name": "ConnectorTestRun",
+  "type": "object",
+  "properties": {
+    "channel_account_id": {
+      "type": "string",
+      "description": "Linked ChannelAccount id"
+    },
+    "channel_type": {
+      "type": "string",
+      "enum": [
+        "email",
+        "facebook",
+        "instagram",
+        "whatsapp"
+      ],
+      "description": "Connector channel"
+    },
+    "test_type": {
+      "type": "string",
+      "enum": [
+        "secrets",
+        "inbound",
+        "outbound",
+        "webhook",
+        "policy"
+      ],
+      "description": "Test category"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "skipped"
+      ],
+      "description": "Test result"
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable result"
+    },
+    "details": {
+      "type": "string",
+      "description": "JSON diagnostic details"
+    },
+    "tested_by_id": {
+      "type": "string",
+      "description": "User who ran the test"
+    },
+    "tested_by_name": {
+      "type": "string",
+      "description": "User name"
+    }
+  },
+  "required": [
+    "channel_type",
+    "test_type",
+    "status"
+  ]
+}

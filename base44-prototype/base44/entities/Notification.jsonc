@@ -1,0 +1,27 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "\u63a5\u6536\u8005\u7528\u6237ID\uff08\u4e25\u683c\u79c1\u6709\uff0c\u67e5\u8be2\u5fc5\u987b\u8fc7\u6ee4\u6b64\u5b57\u6bb5\uff09"
+    },
+    "ticket_id": {
+      "type": "string",
+      "description": "\u5173\u8054\u5de5\u5355ID"
+    },
+    "message": {
+      "type": "string",
+      "description": "\u901a\u77e5\u6d88\u606f"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false,
+      "description": "\u662f\u5426\u5df2\u8bfb"
+    }
+  },
+  "required": [
+    "user_id",
+    "message"
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "name": "ShopifyOrderLine",
+  "type": "object",
+  "properties": {
+    "shopify_order_ref": {
+      "type": "string",
+      "description": "\u5173\u8054ShopifyOrder ID\uff08\u672c\u5730\uff09"
+    },
+    "shopify_order_number": {
+      "type": "string",
+      "description": "\u8ba2\u5355\u53f7\uff08\u5197\u4f59\uff0c\u7528\u4e8e\u663e\u793a\uff09"
+    },
+    "shopify_line_item_id": {
+      "type": "string",
+      "description": "Shopify\u539f\u59cb\u884c\u9879\u76eeID"
+    },
+    "sku_ref": {
+      "type": "string",
+      "description": "\u5173\u8054\u672c\u5730Product ID\uff08\u53ef\u9009\uff09"
+    },
+    "shopify_sku": {
+      "type": "string",
+      "description": "Shopify SKU"
+    },
+    "product_name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0"
+    },
+    "variant_title": {
+      "type": "string",
+      "description": "\u89c4\u683c/\u53d8\u4f53\u540d\u79f0"
+    },
+    "quantity_ordered": {
+      "type": "number",
+      "default": 0,
+      "description": "\u8ba2\u8d2d\u6570\u91cf"
+    },
+    "quantity_fulfilled": {
+      "type": "number",
+      "default": 0,
+      "description": "\u5df2\u5c65\u7ea6\u6570\u91cf\uff08\u4ece\u51fa\u5e93\u8bb0\u5f55\u6c47\u603b\uff09"
+    },
+    "unit_price": {
+      "type": "number",
+      "default": 0,
+      "description": "\u5355\u4ef7\uff08USD\uff09"
+    },
+    "line_total": {
+      "type": "number",
+      "default": 0,
+      "description": "\u884c\u5c0f\u8ba1\uff08USD\uff09"
+    },
+    "fulfillment_status": {
+      "type": "string",
+      "enum": [
+        "unfulfilled",
+        "partial",
+        "fulfilled"
+      ],
+      "default": "unfulfilled",
+      "description": "\u884c\u9879\u76ee\u5c65\u7ea6\u72b6\u6001"
+    },
+    "tracking_number": {
+      "type": "string",
+      "description": "\u6700\u65b0\u8fd0\u5355\u53f7\uff08\u4ece\u6700\u8fd1\u51fa\u5e93\u8bb0\u5f55\u540c\u6b65\uff09"
+    },
+    "carrier": {
+      "type": "string",
+      "description": "\u7269\u6d41\u5546"
+    }
+  },
+  "required": [
+    "shopify_order_ref",
+    "product_name",
+    "quantity_ordered"
+  ]
+}

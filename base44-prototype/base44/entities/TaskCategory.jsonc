@@ -1,0 +1,23 @@
+{
+  "name": "TaskCategory",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "\u5206\u7c7b\u540d\u79f0"
+    },
+    "color": {
+      "type": "string",
+      "description": "\u989c\u8272\uff08hex\uff09",
+      "default": "#4A5B7A"
+    },
+    "order": {
+      "type": "number",
+      "default": 0,
+      "description": "\u6392\u5e8f\u5e8f\u53f7"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

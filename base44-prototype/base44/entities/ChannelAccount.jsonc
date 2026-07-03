@@ -1,0 +1,89 @@
+{
+  "name": "ChannelAccount",
+  "type": "object",
+  "properties": {
+    "channel_type": {
+      "type": "string",
+      "enum": [
+        "email",
+        "facebook",
+        "instagram",
+        "whatsapp"
+      ],
+      "description": "Connected channel type"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "User-facing account name"
+    },
+    "external_account_id": {
+      "type": "string",
+      "description": "Provider account/page/phone id"
+    },
+    "setup_status": {
+      "type": "string",
+      "enum": [
+        "not_configured",
+        "needs_secrets",
+        "testing",
+        "connected",
+        "degraded",
+        "error"
+      ],
+      "default": "not_configured",
+      "description": "Connector setup status"
+    },
+    "webhook_status": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "healthy",
+        "stale",
+        "failing"
+      ],
+      "default": "unknown",
+      "description": "Webhook health status"
+    },
+    "send_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether outbound sending is enabled"
+    },
+    "receive_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether inbound receiving is enabled"
+    },
+    "last_inbound_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last inbound message timestamp"
+    },
+    "last_outbound_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last outbound message timestamp"
+    },
+    "last_test_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last connector test timestamp"
+    },
+    "last_error": {
+      "type": "string",
+      "description": "Latest connector error"
+    },
+    "webhook_url": {
+      "type": "string",
+      "description": "Webhook URL configured at provider"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Internal setup notes"
+    }
+  },
+  "required": [
+    "channel_type",
+    "display_name"
+  ]
+}

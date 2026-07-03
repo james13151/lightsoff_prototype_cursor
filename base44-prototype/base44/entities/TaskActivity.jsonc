@@ -1,0 +1,44 @@
+{
+  "name": "TaskActivity",
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "\u5173\u8054\u4efb\u52a1ID"
+    },
+    "author_id": {
+      "type": "string",
+      "description": "\u4f5c\u8005\u7528\u6237ID"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "\u4f5c\u8005\u59d3\u540d"
+    },
+    "entry_type": {
+      "type": "string",
+      "enum": [
+        "comment",
+        "status_change",
+        "assignment",
+        "system"
+      ],
+      "default": "comment"
+    },
+    "content": {
+      "type": "string",
+      "description": "\u5185\u5bb9"
+    },
+    "old_value": {
+      "type": "string",
+      "description": "\u53d8\u66f4\u524d\u7684\u503c"
+    },
+    "new_value": {
+      "type": "string",
+      "description": "\u53d8\u66f4\u540e\u7684\u503c"
+    }
+  },
+  "required": [
+    "task_id",
+    "content"
+  ]
+}
