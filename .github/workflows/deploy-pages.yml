@@ -45,11 +45,9 @@ jobs:
           touch dist/.nojekyll
         working-directory: lightsoff
 
-      # Auto-enable Pages on first deploy (requires public repo + administration: write)
       - name: Configure Pages
         uses: actions/configure-pages@v6
-        with:
-          enablement: true
+        # Fails until Settings → Pages → Source is set to "GitHub Actions" (one-time).
 
       - uses: actions/upload-pages-artifact@v5
         with:
