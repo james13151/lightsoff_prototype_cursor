@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useStore } from '../store'
 import {
   adjustInventory, createProduct, createPurchaseOrder, createReceipt, createVendor, createWarehouse,
@@ -218,6 +218,19 @@ export function Inventory() {
     ? state.stockByWarehouse.filter((s) => s.warehouseId === stockWarehouseFilter && s.onHand !== 0)
     : state.stockByWarehouse.filter((s) => s.onHand !== 0)
 
+  const totalOnHand = (variantId: string) => {
+    const rows = state.stockByWarehouse.filter((s) => s.variantId === variantId)
+    if (rows.length > 0) return rows.reduce((sum, s) => sum + s.onHand, 0)
+    return state.products.find((p) => p.id === variantId)?.stock ?? 0
+  }
+
+  useEffect(() => {
+    if (!rcvPo) return
+    const po = state.purchaseOrders.find((p) => p.id === rcvPo)
+    const line = po?.lines.find((l) => (l.receivedQty ?? 0) < l.qty) ?? po?.lines[0]
+    if (line?.productId) setRcvVariant(line.productId)
+  }, [rcvPo, state.purchaseOrders])
+
   async function onAddVendor(e: FormEvent) {
     e.preventDefault()
     if (!vendorNameInput.trim()) return
@@ -381,8 +394,9 @@ export function Inventory() {
     if (!vendorId || !qty) return
     const isSample = rcvType === 'sample'
     const po = state.purchaseOrders.find((p) => p.id === rcvPo)
-    const poLine = po?.lines[0]
-    const variantId = rcvVariant || poLine?.productId || defaultVariant
+    const variantId = rcvVariant || po?.lines[0]?.productId || defaultVariant
+    if (!isSample && !variantId) return
+    const poLine = po?.lines.find((l) => l.productId === variantId) ?? po?.lines[0]
     await spineMutate(
       () => createReceipt(auth!.token, auth!.tenantId, {
         vendorId,
@@ -404,6 +418,8 @@ export function Inventory() {
         description: isSample ? 'Sample item' : undefined,
       },
     )
+    setTab('stock')
+    setStockWarehouseFilter('')
   }
 
   async function onAdjust(e: FormEvent) {
@@ -486,24 +502,27 @@ export function Inventory() {
                   })
                 ) : state.products.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No products yet — add one under Master data.</td></tr>
-                ) : state.products.map((p) => (
+                ) : state.products.map((p) => {
+                  const onHand = totalOnHand(p.id)
+                  return (
                   <tr key={p.id} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-2.5 text-xs text-slate-500">
                       {state.stockByWarehouse.filter((s) => s.variantId === p.id && s.onHand > 0).map((s) => s.warehouseCode).join(', ') || '—'}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{p.sku}</td>
                     <td className="px-4 py-2.5">{p.name}</td>
-                    <td className={`px-4 py-2.5 text-right font-medium ${p.stock === 0 ? 'text-rose-600' : p.stock <= p.reorderPoint ? 'text-amber-600' : ''}`}>
-                      {p.stock}
+                    <td className={`px-4 py-2.5 text-right font-medium ${onHand === 0 ? 'text-rose-600' : onHand <= p.reorderPoint ? 'text-amber-600' : ''}`}>
+                      {onHand}
                     </td>
                     <td className="px-4 py-2.5 text-right text-slate-500">{p.reorderPoint}</td>
                     <td className="px-4 py-2.5">
-                      {p.stock === 0 ? <Badge tone="rose">out of stock</Badge>
-                        : p.stock <= p.reorderPoint ? <Badge tone="amber">below reorder point</Badge>
+                      {onHand === 0 ? <Badge tone="rose">out of stock</Badge>
+                        : onHand <= p.reorderPoint ? <Badge tone="amber">below reorder point</Badge>
                         : <Badge tone="emerald">healthy</Badge>}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </Card>
@@ -935,7 +954,7 @@ export function Inventory() {
               </Field>
               <Field label="Product">
                 <Select value={adjVariant || defaultVariant} onChange={(e) => setAdjVariant(e.target.value)}>
-                  {state.products.map((p) => <option key={p.id} value={p.id}>{p.sku} (total: {p.stock})</option>)}
+                  {state.products.map((p) => <option key={p.id} value={p.id}>{p.sku} (total: {totalOnHand(p.id)})</option>)}
                 </Select>
               </Field>
               <Field label="Qty change (+/-)">

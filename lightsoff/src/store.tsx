@@ -102,6 +102,57 @@ function pushEvent(state: AppState, type: string, module: string, summary: strin
   return [{ id: nid('e'), type, module, summary, at: now() }, ...state.events]
 }
 
+/** Keep per-location stock, aggregate product stock, and master variants in sync. */
+function bumpStock(
+  state: AppState,
+  variantId: string,
+  qtyDelta: number,
+  warehouseId?: string,
+): Pick<AppState, 'stockByWarehouse' | 'products' | 'productMasters'> {
+  const product = state.products.find((p) => p.id === variantId)
+  const warehouse = warehouseId
+    ? state.warehouses.find((w) => w.id === warehouseId)
+    : state.warehouses.find((w) => w.isDefault) ?? state.warehouses[0]
+
+  let stockByWarehouse = [...state.stockByWarehouse]
+  if (warehouse && product) {
+    const idx = stockByWarehouse.findIndex((s) => s.warehouseId === warehouse.id && s.variantId === variantId)
+    if (idx >= 0) {
+      stockByWarehouse[idx] = { ...stockByWarehouse[idx], onHand: stockByWarehouse[idx].onHand + qtyDelta }
+    } else {
+      stockByWarehouse.push({
+        warehouseId: warehouse.id,
+        warehouseCode: warehouse.code,
+        warehouseName: warehouse.name,
+        isDefault: warehouse.isDefault,
+        variantId,
+        sku: product.sku,
+        onHand: qtyDelta,
+        reorderPoint: product.reorderPoint,
+      })
+    }
+  }
+
+  const totalStock = stockByWarehouse
+    .filter((s) => s.variantId === variantId)
+    .reduce((sum, s) => sum + s.onHand, 0)
+
+  const products = state.products.map((p) =>
+    p.id === variantId ? { ...p, stock: totalStock } : p,
+  )
+
+  const productMasters = state.productMasters.length > 0
+    ? state.productMasters.map((pm) => ({
+        ...pm,
+        variants: pm.variants.map((v) =>
+          v.id === variantId ? { ...v, stock: totalStock } : v,
+        ),
+      }))
+    : state.productMasters
+
+  return { stockByWarehouse, products, productMasters }
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'APPROVE_REPLY': {
@@ -454,7 +505,16 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
     case 'CREATE_RECEIPT': {
-      const product = action.variantId ? state.products.find((p) => p.id === action.variantId) : undefined
+      const isCommercial = action.receiptType !== 'sample'
+      const product = isCommercial && action.variantId
+        ? state.products.find((p) => p.id === action.variantId)
+        : undefined
+      if (isCommercial && !action.variantId) {
+        return { ...state, toast: 'Select a product for commercial receipts.' }
+      }
+      if (isCommercial && !product) {
+        return { ...state, toast: 'Product not found — stock was not updated.' }
+      }
       const warehouse = action.warehouseId
         ? state.warehouses.find((w) => w.id === action.warehouseId)
         : state.warehouses.find((w) => w.isDefault) ?? state.warehouses[0]
@@ -478,9 +538,11 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         receipts: [receipt, ...state.receipts],
         events: pushEvent(state, 'inventory.received', 'Inventory', `${receipt.id}: +${action.qty} received`),
-        toast: `Receipt ${receipt.id} recorded.`,
+        toast: product
+          ? `Receipt ${receipt.id} recorded — ${product.sku} now ${(product.stock + action.qty)} on hand.`
+          : `Receipt ${receipt.id} recorded.`,
       }
-      if (action.receiptType !== 'sample' && product) {
+      if (isCommercial && product) {
         const entry: InventoryLedgerEntry = {
           id: nid('il'),
           productId: product.id,
@@ -492,29 +554,11 @@ function reducer(state: AppState, action: Action): AppState {
           warehouseCode: warehouse?.code,
           location: warehouse?.code,
         }
-        const stockByWarehouse = [...next.stockByWarehouse]
-        if (warehouse) {
-          const idx = stockByWarehouse.findIndex((s) => s.warehouseId === warehouse.id && s.variantId === product.id)
-          if (idx >= 0) {
-            stockByWarehouse[idx] = { ...stockByWarehouse[idx], onHand: stockByWarehouse[idx].onHand + action.qty }
-          } else {
-            stockByWarehouse.push({
-              warehouseId: warehouse.id,
-              warehouseCode: warehouse.code,
-              warehouseName: warehouse.name,
-              isDefault: warehouse.isDefault,
-              variantId: product.id,
-              sku: product.sku,
-              onHand: action.qty,
-              reorderPoint: product.reorderPoint,
-            })
-          }
-        }
+        const stock = bumpStock(state, product.id, action.qty, warehouse?.id)
         return {
           ...next,
+          ...stock,
           ledger: [entry, ...next.ledger],
-          stockByWarehouse,
-          products: next.products.map((p) => (p.id === product.id ? { ...p, stock: p.stock + action.qty } : p)),
           purchaseOrders: action.poId
             ? next.purchaseOrders.map((po) =>
                 po.id === action.poId
@@ -552,31 +596,11 @@ function reducer(state: AppState, action: Action): AppState {
         warehouseCode: warehouse?.code,
         location: warehouse?.code,
       }
-      const stockByWarehouse = [...state.stockByWarehouse]
-      if (warehouse) {
-        const idx = stockByWarehouse.findIndex((s) => s.warehouseId === warehouse.id && s.variantId === product.id)
-        if (idx >= 0) {
-          stockByWarehouse[idx] = { ...stockByWarehouse[idx], onHand: stockByWarehouse[idx].onHand + action.qtyDelta }
-        } else {
-          stockByWarehouse.push({
-            warehouseId: warehouse.id,
-            warehouseCode: warehouse.code,
-            warehouseName: warehouse.name,
-            isDefault: warehouse.isDefault,
-            variantId: product.id,
-            sku: product.sku,
-            onHand: action.qtyDelta,
-            reorderPoint: product.reorderPoint,
-          })
-        }
-      }
+      const stock = bumpStock(state, product.id, action.qtyDelta, warehouse?.id)
       return {
         ...state,
+        ...stock,
         ledger: [entry, ...state.ledger],
-        stockByWarehouse,
-        products: state.products.map((p) =>
-          p.id === product.id ? { ...p, stock: p.stock + action.qtyDelta } : p,
-        ),
         events: pushEvent(state, 'inventory.adjusted', 'Inventory', `${product.sku} ${action.qtyDelta > 0 ? '+' : ''}${action.qtyDelta}`),
         toast: `Stock adjusted for ${product.sku}.`,
       }
@@ -664,23 +688,36 @@ function applyCapture(state: AppState, draft: CaptureDraft): AppState {
       const product = state.products.find((x) => x.id === p.productId)
       const qty = Number(p.qty)
       if (!product) return state
+      const warehouse = state.warehouses.find((w) => w.isDefault) ?? state.warehouses[0]
       const receipt: Receipt = {
         id: nid('RCV'),
         poId: (p.poId as string) || null,
         vendorId: (p.vendorId as string) || state.vendors[0].id,
         type: 'commercial',
+        warehouseId: warehouse?.id,
+        warehouseCode: warehouse?.code,
+        warehouseName: warehouse?.name,
         createdAt: now(),
         lines: [{ productId: product.id, description: product.name, qty }],
         discrepancy: null,
       }
       const entry: InventoryLedgerEntry = {
-        id: nid('il'), productId: product.id, qtyDelta: qty, reason: 'po_receipt', refId: receipt.id, at: now(),
+        id: nid('il'),
+        productId: product.id,
+        qtyDelta: qty,
+        reason: 'po_receipt',
+        refId: receipt.id,
+        at: now(),
+        warehouseId: warehouse?.id,
+        warehouseCode: warehouse?.code,
+        location: warehouse?.code,
       }
+      const stock = bumpStock(state, product.id, qty, warehouse?.id)
       return {
         ...state,
+        ...stock,
         receipts: [receipt, ...state.receipts],
         ledger: [entry, ...state.ledger],
-        products: state.products.map((x) => (x.id === product.id ? { ...x, stock: x.stock + qty } : x)),
         events: pushEvent(state, 'inventory.received', 'Inventory', `${receipt.id}: +${qty} ${product.sku} received — stock pushed to Shopify`),
         toast: `Receipt ${receipt.id} confirmed. Stock +${qty} → synced to Shopify.`,
       }
@@ -871,14 +908,20 @@ export function StoreProvider({
     if (mode !== 'live' || !auth) return
     setLoading(true)
     try {
-      const [spine, members, me] = await Promise.all([
-        fetchSpineSnapshot(auth.token, auth.tenantId),
-        fetchMembers(auth.token, auth.tenantId),
-        fetchMe(auth.token, auth.tenantId),
-      ])
+      const spine = await fetchSpineSnapshot(auth.token, auth.tenantId)
       rawDispatch({ type: 'HYDRATE', spine })
-      rawDispatch({ type: 'SET_TEAM', members })
-      setLiveRole(me.role)
+      try {
+        const members = await fetchMembers(auth.token, auth.tenantId)
+        rawDispatch({ type: 'SET_TEAM', members })
+      } catch {
+        // Team endpoints are optional — don't block inventory sync
+      }
+      try {
+        const me = await fetchMe(auth.token, auth.tenantId)
+        setLiveRole(me.role)
+      } catch {
+        // Profile endpoints are optional — don't block inventory sync
+      }
     } finally {
       setLoading(false)
     }
@@ -893,7 +936,12 @@ export function StoreProvider({
       try {
         if (mode === 'live' && auth) {
           await live()
-          await refresh()
+          rawDispatch(demo)
+          try {
+            await refresh()
+          } catch (err) {
+            rawDispatch({ type: 'SET_TOAST', message: `Saved — re-sync failed: ${(err as Error).message}` })
+          }
         } else {
           rawDispatch(demo)
         }
