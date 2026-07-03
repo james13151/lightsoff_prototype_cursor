@@ -4,6 +4,7 @@ import { requireAuth } from './auth.js'
 import { withUser } from './db.js'
 import { inventoryRoutes } from './routes/inventory.js'
 import { financeRoutes } from './routes/finance.js'
+import { memberRoutes } from './routes/members.js'
 import { registerDevAuth } from './devAuth.js'
 import { env } from './env.js'
 
@@ -25,6 +26,7 @@ export function buildServer() {
 
     inventoryRoutes(authed)
     financeRoutes(authed)
+    memberRoutes(authed)
 
     // ---- Tenants ----
 

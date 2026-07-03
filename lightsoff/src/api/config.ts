@@ -1,4 +1,6 @@
 /** API base URL. In local dev, Vite proxies `/api` → localhost:3001. */
+import type { MemberRole } from '../lib/permissions'
+
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
 
 export const isApiMode = Boolean(API_URL)
@@ -10,6 +12,9 @@ export interface AuthSession {
   userId: string
   tenantId: string
   tenantName: string
+  role?: MemberRole
+  displayName?: string
+  email?: string
 }
 
 export function loadAuth(): AuthSession | null {

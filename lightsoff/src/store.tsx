@@ -7,11 +7,15 @@ import type {
 import * as seed from './data/seed'
 import type { AuthSession } from './api/config'
 import { fetchSpineSnapshot, executeSpineAction, type SpineSnapshot, type FinanceSummary } from './api/spine'
+import { fetchMembers, fetchMe, type TeamMember } from './api/members'
+import type { MemberRole, Permission } from './lib/permissions'
+import { can } from './lib/permissions'
 
 export interface AppState {
   vendors: Vendor[]
   warehouses: Warehouse[]
   stockByWarehouse: StockByWarehouse[]
+  teamMembers: TeamMember[]
   products: Product[]
   productMasters: ProductMaster[]
   purchaseOrders: PurchaseOrder[]
@@ -36,6 +40,7 @@ const initialState: AppState = {
   vendors: seed.vendors,
   warehouses: seed.warehouses,
   stockByWarehouse: seed.stockByWarehouse,
+  teamMembers: seed.teamMembers,
   products: seed.products,
   productMasters: [],
   purchaseOrders: seed.purchaseOrders,
@@ -72,6 +77,10 @@ type Action =
   | { type: 'SET_AUTO_APPLY'; value: boolean }
   | { type: 'SET_TOAST'; message: string | null }
   | { type: 'HYDRATE'; spine: SpineSnapshot }
+  | { type: 'SET_TEAM'; members: TeamMember[] }
+  | { type: 'ADD_TEAM_MEMBER'; userId: string; role: MemberRole; displayName: string; email?: string }
+  | { type: 'UPDATE_TEAM_MEMBER_ROLE'; userId: string; role: MemberRole }
+  | { type: 'REMOVE_TEAM_MEMBER'; userId: string }
   | { type: 'ADD_VENDOR'; name: string; leadTimeDays?: number; contactEmail?: string; phone?: string; paymentTerms?: string; notes?: string; isRecurring?: boolean }
   | { type: 'UPDATE_VENDOR'; vendorId: string; name: string; leadTimeDays?: number; contactEmail?: string; phone?: string; paymentTerms?: string; notes?: string; isRecurring?: boolean }
   | { type: 'CREATE_WAREHOUSE'; code: string; name: string; isDefault?: boolean; contactName?: string; contactEmail?: string; contactPhone?: string; address?: LocationAddress }
@@ -254,6 +263,38 @@ function reducer(state: AppState, action: Action): AppState {
         claims: action.spine.claims,
         events: action.spine.events,
         financeSummary: action.spine.financeSummary,
+      }
+    case 'SET_TEAM':
+      return { ...state, teamMembers: action.members }
+    case 'ADD_TEAM_MEMBER': {
+      const member: TeamMember = {
+        tenantId: 'demo',
+        userId: action.userId,
+        role: action.role,
+        displayName: action.displayName,
+        email: action.email,
+        joinedAt: now(),
+      }
+      return {
+        ...state,
+        teamMembers: [...state.teamMembers.filter((m) => m.userId !== action.userId), member],
+        events: pushEvent(state, 'team.member_added', 'System', `${action.displayName} invited as ${action.role}`),
+        toast: `${action.displayName} added to workspace.`,
+      }
+    }
+    case 'UPDATE_TEAM_MEMBER_ROLE':
+      return {
+        ...state,
+        teamMembers: state.teamMembers.map((m) =>
+          m.userId === action.userId ? { ...m, role: action.role } : m,
+        ),
+        toast: `Role updated to ${action.role}.`,
+      }
+    case 'REMOVE_TEAM_MEMBER':
+      return {
+        ...state,
+        teamMembers: state.teamMembers.filter((m) => m.userId !== action.userId),
+        toast: 'Member removed from workspace.',
       }
     case 'ADD_VENDOR': {
       const vendor: Vendor = {
@@ -791,6 +832,8 @@ const StoreContext = createContext<{
   mode: 'demo' | 'live'
   loading: boolean
   auth: AuthSession | null
+  role: MemberRole
+  can: (permission: Permission) => boolean
 } | null>(null)
 
 const SPINE_ACTIONS = new Set(['PAY_BILL', 'APPROVE_CLAIM', 'REJECT_CLAIM', 'CREATE_REORDER_PO'])
@@ -818,13 +861,24 @@ export function StoreProvider({
 }) {
   const [state, rawDispatch] = useReducer(reducer, initialState)
   const [loading, setLoading] = useState(false)
+  const [liveRole, setLiveRole] = useState<MemberRole | undefined>(auth?.role)
+
+  useEffect(() => {
+    setLiveRole(auth?.role)
+  }, [auth?.role])
 
   const refresh = useCallback(async () => {
     if (mode !== 'live' || !auth) return
     setLoading(true)
     try {
-      const spine = await fetchSpineSnapshot(auth.token, auth.tenantId)
+      const [spine, members, me] = await Promise.all([
+        fetchSpineSnapshot(auth.token, auth.tenantId),
+        fetchMembers(auth.token, auth.tenantId),
+        fetchMe(auth.token, auth.tenantId),
+      ])
       rawDispatch({ type: 'HYDRATE', spine })
+      rawDispatch({ type: 'SET_TEAM', members })
+      setLiveRole(me.role)
     } finally {
       setLoading(false)
     }
@@ -879,8 +933,10 @@ export function StoreProvider({
     [mode, auth, state.bills, state.purchaseOrders, state.settings, state.vendors, state.products, refresh],
   )
 
+  const role: MemberRole = mode === 'live' ? (liveRole ?? auth?.role ?? 'member') : (auth?.role ?? 'owner')
+
   return (
-    <StoreContext.Provider value={{ state, dispatch, refresh, spineMutate, mode, loading, auth }}>
+    <StoreContext.Provider value={{ state, dispatch, refresh, spineMutate, mode, loading, auth, role, can: (p) => can(role, p) }}>
       {children}
     </StoreContext.Provider>
   )

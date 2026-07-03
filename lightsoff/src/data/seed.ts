@@ -2,6 +2,7 @@ import type {
   Vendor, Warehouse, StockByWarehouse, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
 } from '../types'
+import type { TeamMember } from '../api/members'
 
 const daysAgo = (n: number) => {
   const d = new Date()
@@ -13,6 +14,33 @@ const daysFromNow = (n: number) => {
   d.setDate(d.getDate() + n)
   return d.toISOString()
 }
+
+export const teamMembers: TeamMember[] = [
+  {
+    tenantId: 'demo',
+    userId: '11111111-1111-1111-1111-111111111111',
+    role: 'owner',
+    displayName: 'Alex Chen',
+    email: 'alex@brand.com',
+    joinedAt: daysAgo(90),
+  },
+  {
+    tenantId: 'demo',
+    userId: '22222222-2222-2222-2222-222222222222',
+    role: 'admin',
+    displayName: 'Sam Rivera',
+    email: 'sam@brand.com',
+    joinedAt: daysAgo(60),
+  },
+  {
+    tenantId: 'demo',
+    userId: '33333333-3333-3333-3333-333333333333',
+    role: 'member',
+    displayName: 'Jordan Lee',
+    email: 'jordan@brand.com',
+    joinedAt: daysAgo(14),
+  },
+]
 
 export const vendors: Vendor[] = [
   { id: 'v1', name: 'Acme Textiles', leadTimeDays: 12, isRecurring: true, contactEmail: 'orders@acmetextiles.com', phone: '+1 415-555-0101', paymentTerms: 'Net 30' },
