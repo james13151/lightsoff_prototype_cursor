@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { apiFetch, checkApiHealth, fetchDevToken } from '../api/client'
-import { API_URL, DEV_USER_ID, type AuthSession } from '../api/config'
+import { API_URL, DEV_USER_ID, isSupabaseConfigured, type AuthSession } from '../api/config'
 import { fetchMe } from '../api/members'
+import { getSupabase } from '../lib/supabase'
 import { Button, Card } from './ui'
 
 interface TenantRow {
@@ -10,28 +11,67 @@ interface TenantRow {
   role: string
 }
 
+type AuthMode = 'supabase' | 'dev'
+
 export function ConnectScreen({ onConnect }: { onConnect: (session: AuthSession) => void }) {
   const [userId, setUserId] = useState(DEV_USER_ID)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [tenantName, setTenantName] = useState('My Brand')
   const [token, setToken] = useState<string | null>(null)
   const [tenants, setTenants] = useState<TenantRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [devAuth, setDevAuth] = useState<boolean | null>(null)
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null)
+  const [signUp, setSignUp] = useState(false)
 
-  const connect = async () => {
+  const loadTenants = async (accessToken: string, uid: string) => {
+    const list = await apiFetch<TenantRow[]>('/v1/tenants', { token: accessToken })
+    setToken(accessToken)
+    setUserId(uid)
+    setTenants(list)
+  }
+
+  const connectDev = async () => {
     setBusy(true)
     setError(null)
     try {
       const health = await checkApiHealth()
-      setDevAuth(health.devAuth ?? false)
       if (!health.devAuth) {
-        throw new Error('API is up but ALLOW_DEV_AUTH is not enabled. Set ALLOW_DEV_AUTH=true on the API host.')
+        throw new Error('API is up but ALLOW_DEV_AUTH is not enabled. Use Supabase sign-in or enable dev auth locally.')
       }
       const t = await fetchDevToken(userId)
-      setToken(t)
-      const list = await apiFetch<TenantRow[]>('/v1/tenants', { token: t })
-      setTenants(list)
+      setAuthMode('dev')
+      await loadTenants(t, userId)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const connectSupabase = async () => {
+    if (!email.trim() || !password) {
+      setError('Email and password are required')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const supabase = getSupabase()
+      const { data, error: authError } = signUp
+        ? await supabase.auth.signUp({ email: email.trim(), password })
+        : await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (authError) throw authError
+      const session = data.session
+      if (!session?.access_token || !session.user?.id) {
+        if (signUp) {
+          throw new Error('Account created — check your email if confirmation is required, then sign in.')
+        }
+        throw new Error('No session returned')
+      }
+      setAuthMode('supabase')
+      await loadTenants(session.access_token, session.user.id)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -109,28 +149,72 @@ export function ConnectScreen({ onConnect }: { onConnect: (session: AuthSession)
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
       <Card className="w-full max-w-md p-6">
-        <h1 className="text-lg font-semibold">Connect to LightsOff API</h1>
+        <h1 className="text-lg font-semibold">Connect to LightsOff</h1>
         <p className="mt-1 text-sm text-slate-500">
           Spine modules (Inventory + Finance) load from the real database. Inbox, Marketing, and R&D stay in demo mode until Phase 2/3.
         </p>
-        <p className="mt-2 font-mono text-xs text-slate-400">API: {API_URL || '(not configured — demo mode)'}</p>
-
-        <label className="mt-4 block text-sm">
-          <span className="text-slate-600">User ID (dev)</span>
-          <input
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          />
-        </label>
+        <p className="mt-2 font-mono text-xs text-slate-400">API: {API_URL}</p>
 
         {!token ? (
-          <Button className="mt-4 w-full" onClick={() => void connect()} disabled={busy}>
-            {busy ? 'Connecting…' : 'Connect'}
-          </Button>
+          isSupabaseConfigured ? (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-slate-600">
+                {signUp ? 'Create a Supabase account' : 'Sign in with Supabase'}
+              </p>
+              <label className="block text-sm">
+                <span className="text-slate-600">Email</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  autoComplete="email"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-slate-600">Password</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  autoComplete={signUp ? 'new-password' : 'current-password'}
+                />
+              </label>
+              <Button className="w-full" onClick={() => void connectSupabase()} disabled={busy}>
+                {busy ? 'Connecting…' : signUp ? 'Sign up' : 'Sign in'}
+              </Button>
+              <button
+                type="button"
+                className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
+                onClick={() => {
+                  setSignUp((v) => !v)
+                  setError(null)
+                }}
+              >
+                {signUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              <label className="block text-sm">
+                <span className="text-slate-600">User ID (dev)</span>
+                <input
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <Button className="w-full" onClick={() => void connectDev()} disabled={busy}>
+                {busy ? 'Connecting…' : 'Connect (dev auth)'}
+              </Button>
+            </div>
+          )
         ) : (
           <div className="mt-4 space-y-3">
-            <div className="text-xs text-emerald-600">● Authenticated {devAuth ? '(dev auth)' : ''}</div>
+            <div className="text-xs text-emerald-600">
+              ● Authenticated {authMode === 'dev' ? '(dev auth)' : '(Supabase)'}
+            </div>
             {tenants.length === 0 ? (
               <>
                 <p className="text-sm text-slate-600">No workspace yet — create one:</p>
@@ -175,7 +259,9 @@ export function ConnectScreen({ onConnect }: { onConnect: (session: AuthSession)
         {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
 
         <p className="mt-6 text-[11px] text-slate-400">
-          Local setup: API on :3001 with <code>ALLOW_DEV_AUTH=true</code>, frontend <code>VITE_API_URL=/api</code> (Vite proxy).
+          {isSupabaseConfigured
+            ? 'Production: Supabase Auth + API on Render/Fly. See docs/DEPLOY.md.'
+            : 'Local: API on :3001 with ALLOW_DEV_AUTH=true, frontend VITE_API_URL=/api (Vite proxy).'}
         </p>
       </Card>
     </div>

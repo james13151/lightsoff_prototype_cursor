@@ -37,7 +37,7 @@ Open `http://localhost:5173` → **Connect** screen → pick or create a workspa
 - **Inbox, Marketing, R&D, Collab** remain demo data until Phase 2/3
 - Sidebar shows `Live — Inventory + Finance from DB` when connected
 
-For production: set `VITE_API_URL` to your Railway API URL at build time; use Supabase Auth tokens instead of dev auth.
+For production: see [docs/DEPLOY.md](../docs/DEPLOY.md) — **Supabase** (DB + Auth) + **GitHub Pages** (frontend) + **Render** (API free tier).
 
 ## GitHub Pages (demo deploy)
 
@@ -52,6 +52,8 @@ If the site returns **404**, the deploy workflow may still be green — check th
 3. After changing settings, re-run the workflow: **Actions → Deploy to GitHub Pages → Run workflow**.
 
 The workflow builds with `--base=/lightsoff_prototype_cursor/` and includes a `404.html` SPA fallback.
+
+**Live mode on Pages:** set GitHub Actions secrets `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_API_URL` — see [docs/DEPLOY.md](../docs/DEPLOY.md). Without those secrets the site runs in demo mode only.
 
 ## What's in the prototype
 

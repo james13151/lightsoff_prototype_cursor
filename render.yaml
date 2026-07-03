@@ -1,0 +1,23 @@
+# Optional: deploy the Fastify API on Render (free tier spins down after inactivity).
+# GitHub Pages serves the frontend; Supabase hosts Postgres + Auth.
+# Connect this blueprint in Render → New → Blueprint.
+services:
+  - type: web
+    name: lightsoff-api
+    runtime: node
+    rootDir: api
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      - key: ALLOW_DEV_AUTH
+        value: "false"

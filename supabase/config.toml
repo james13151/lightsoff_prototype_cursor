@@ -1,0 +1,32 @@
+# Supabase CLI config — link to your project with:
+#   supabase login
+#   supabase link --project-ref <your-project-ref>
+#
+# Apply migrations:
+#   supabase db push
+
+project_id = "your-project-ref"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "app"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.migrations]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "https://james13151.github.io/lightsoff_prototype_cursor/"
+additional_redirect_urls = ["http://localhost:5173"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

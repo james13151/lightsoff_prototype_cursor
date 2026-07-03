@@ -35,6 +35,10 @@ jobs:
 
       # Project pages are served from /<repo-name>/, so the asset base must match
       - name: Build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build -- --base=/${{ github.event.repository.name }}/
         working-directory: lightsoff
 

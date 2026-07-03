@@ -1,5 +1,15 @@
 # lightsoff_prototype_cursor
 
+## Deploy (production)
+
+**Supabase + GitHub Pages** — full guide: [docs/DEPLOY.md](docs/DEPLOY.md)
+
+| Component | Host |
+|-----------|------|
+| Database + Auth | Supabase (free) |
+| Frontend | GitHub Pages (free) |
+| API | Render free tier (or Fly/Railway) |
+
 ## Repository layout
 
 | Directory | What it is |

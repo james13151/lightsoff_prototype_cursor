@@ -67,7 +67,9 @@ sudo -u postgres bash supabase/tests/run_tests.sh
 create role lightsoff_api login password '...' in role authenticated;
 ```
 
-**API → Railway / Fly.io / Render**
+**API → Render / Fly.io / Railway**
+
+See [docs/DEPLOY.md](../docs/DEPLOY.md) for the full Supabase + GitHub Pages + Render setup. A [`render.yaml`](../render.yaml) blueprint is included for one-click API deploy.
 
 1. Deploy the `api/` directory (build: `npm run build`, start: `npm start`).
 2. Environment variables:
