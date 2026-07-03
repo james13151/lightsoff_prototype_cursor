@@ -39,6 +39,20 @@ Open `http://localhost:5173` → **Connect** screen → pick or create a workspa
 
 For production: set `VITE_API_URL` to your Railway API URL at build time; use Supabase Auth tokens instead of dev auth.
 
+## GitHub Pages (demo deploy)
+
+**Live URL:** https://james13151.github.io/lightsoff_prototype_cursor/
+
+Pushes to `main` that touch `lightsoff/**` auto-deploy via `.github/workflows/deploy-pages.yml`.
+
+If the site returns **404**, the deploy workflow may still be green — check these repo settings:
+
+1. **Settings → Pages → Build and deployment → Source:** must be **GitHub Actions** (not "Deploy from a branch").
+2. **Repository visibility:** GitHub Free only serves Pages from **public** repos. Private repos need GitHub Pro (or make the repo public).
+3. After changing settings, re-run the workflow: **Actions → Deploy to GitHub Pages → Run workflow**.
+
+The workflow builds with `--base=/lightsoff_prototype_cursor/` and includes a `404.html` SPA fallback.
+
 ## What's in the prototype
 
 The three UX surfaces from the spec:

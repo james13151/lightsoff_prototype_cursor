@@ -38,6 +38,13 @@ jobs:
         run: npm run build -- --base=/${{ github.event.repository.name }}/
         working-directory: lightsoff
 
+      # SPA fallback + skip Jekyll processing (required for client-side routing on Pages)
+      - name: Prepare Pages artifact
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+        working-directory: lightsoff
+
       # Pages must be enabled once in repo Settings -> Pages -> Source: GitHub Actions.
       # (Auto-enablement fails: the workflow GITHUB_TOKEN lacks repo-admin rights.)
       - name: Configure Pages
