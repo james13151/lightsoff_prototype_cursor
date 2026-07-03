@@ -215,6 +215,53 @@ export interface Campaign {
 
 export type ChannelKind = 'instagram' | 'whatsapp' | 'email' | 'facebook'
 export type Sentiment = 'positive' | 'neutral' | 'negative'
+export type AiRisk = 'low' | 'medium' | 'high'
+export type SendPolicyState = 'ready' | 'needs_secrets' | 'receive_only' | 'outside_service_window' | 'blocked'
+
+export type ChannelSetupStatus = 'not_configured' | 'needs_secrets' | 'testing' | 'connected' | 'degraded' | 'error'
+export type WebhookHealth = 'unknown' | 'healthy' | 'failing'
+
+export interface ChannelAccount {
+  id: string
+  channel: ChannelKind
+  displayName: string
+  setupStatus: ChannelSetupStatus
+  webhookStatus: WebhookHealth
+  sendEnabled: boolean
+  receiveEnabled: boolean
+  requiredSecrets: string[]
+  setupChecklist: string[]
+  webhookFunction: string
+  webhookQuery?: string
+  lastInboundAt?: string
+  lastOutboundAt?: string
+  lastTestAt?: string
+  lastError?: string
+}
+
+export interface ConnectorTestRun {
+  id: string
+  channel: ChannelKind
+  testType: 'secrets' | 'webhook' | 'inbound' | 'outbound'
+  status: 'success' | 'failed' | 'blocked'
+  message: string
+  at: string
+}
+
+export interface AiDraftRecord {
+  id: string
+  conversationId: string
+  channel: ChannelKind
+  intent: string
+  risk: AiRisk
+  summary: string
+  body: string
+  confidence: Confidence
+  approvalState: 'draft' | 'approved' | 'sent' | 'discarded' | 'blocked'
+  createdAt: string
+  approvedAt?: string
+  sentAt?: string
+}
 
 export interface Message {
   id: string
@@ -226,6 +273,9 @@ export interface Message {
 export interface Conversation {
   id: string
   channel: ChannelKind
+  channelAccountId?: string
+  externalThreadId?: string
+  externalCustomerId?: string
   customerName: string
   subject: string
   messages: Message[]
@@ -233,8 +283,15 @@ export interface Conversation {
   urgent: boolean
   status: 'open' | 'answered' | 'closed'
   aiDraft: string | null
+  aiDraftId?: string
   aiDraftConfidence: Confidence
   aiContext: string[]
+  aiIntent?: string
+  aiRisk?: AiRisk
+  aiSummary?: string
+  sendPolicyState?: SendPolicyState
+  lastExternalMessageAt?: string
+  serviceWindowUntil?: string
 }
 
 export type CardStage = 'requested' | 'received' | 'in_review' | 'approved' | 'rejected' | 'specd_as_sku'

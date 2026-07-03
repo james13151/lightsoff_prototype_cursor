@@ -1,0 +1,48 @@
+{
+  "name": "WarehouseTransfer",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u8c03\u62e8\u65e5\u671f"
+    },
+    "sku_ref": {
+      "type": "string",
+      "description": "SKU\u4ea7\u54c1ID"
+    },
+    "sku_name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0(\u5197\u4f59)"
+    },
+    "from_location": {
+      "type": "string",
+      "description": "\u6765\u6e90\u4ed3\u4f4d"
+    },
+    "to_location": {
+      "type": "string",
+      "description": "\u76ee\u6807\u4ed3\u4f4d"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "\u6570\u91cf"
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "\u64cd\u4f5c\u5458ID"
+    },
+    "operator_name": {
+      "type": "string",
+      "description": "\u64cd\u4f5c\u5458\u59d3\u540d"
+    },
+    "notes": {
+      "type": "string",
+      "description": "\u5907\u6ce8"
+    }
+  },
+  "required": [
+    "date",
+    "sku_ref",
+    "quantity"
+  ]
+}

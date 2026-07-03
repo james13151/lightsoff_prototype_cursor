@@ -1,0 +1,65 @@
+{
+  "name": "PaymentRecord",
+  "type": "object",
+  "properties": {
+    "supplier_name": {
+      "type": "string",
+      "description": "\u4f9b\u5e94\u5546\u540d\u79f0"
+    },
+    "po_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\u5173\u8054PO\u53f7\u5217\u8868"
+    },
+    "po_ref_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\u5173\u8054PO\u7684ID\u5217\u8868\uff08\u7528\u4e8e\u8df3\u8f6c\uff09"
+    },
+    "amount_paid": {
+      "type": "number",
+      "description": "\u4ed8\u6b3e\u91d1\u989d"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "\u94f6\u884c\u8f6c\u8d26",
+        "\u652f\u4ed8\u5b9d",
+        "\u73b0\u91d1",
+        "\u5176\u4ed6"
+      ],
+      "description": "\u4ed8\u6b3e\u65b9\u5f0f"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u4ed8\u6b3e\u65e5\u671f"
+    },
+    "payment_datetime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u4ed8\u6b3e\u65e5\u671f\u65f6\u95f4\uff08\u7cbe\u786e\uff09"
+    },
+    "notes": {
+      "type": "string",
+      "description": "\u5907\u6ce8"
+    },
+    "created_by_id": {
+      "type": "string",
+      "description": "\u521b\u5efa\u4ebaID"
+    },
+    "created_by_name": {
+      "type": "string",
+      "description": "\u521b\u5efa\u4eba\u59d3\u540d"
+    }
+  },
+  "required": [
+    "supplier_name",
+    "amount_paid",
+    "payment_date"
+  ]
+}

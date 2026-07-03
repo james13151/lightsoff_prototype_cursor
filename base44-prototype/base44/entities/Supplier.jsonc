@@ -1,0 +1,29 @@
+{
+  "name": "Supplier",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "\u4f9b\u5e94\u5546\u540d\u79f0"
+    },
+    "contact_person": {
+      "type": "string",
+      "description": "\u8054\u7cfb\u4eba"
+    },
+    "contact_info": {
+      "type": "string",
+      "description": "\u8054\u7cfb\u65b9\u5f0f"
+    },
+    "payment_terms": {
+      "type": "string",
+      "description": "\u4ed8\u6b3e\u6761\u4ef6"
+    },
+    "notes": {
+      "type": "string",
+      "description": "\u5907\u6ce8"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

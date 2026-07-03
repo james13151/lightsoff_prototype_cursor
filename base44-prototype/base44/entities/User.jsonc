@@ -1,0 +1,34 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "staff",
+        "supplier",
+        "partner"
+      ],
+      "default": "staff",
+      "description": "\u7528\u6237\u89d2\u8272"
+    },
+    "linked_supplier": {
+      "type": "string",
+      "description": "\u4f9b\u5e94\u5546\u7528\u6237\u5173\u8054\u7684\u4f9b\u5e94\u5546\u540d\u79f0"
+    },
+    "locale_preference": {
+      "type": "string",
+      "enum": [
+        "zh",
+        "en"
+      ],
+      "description": "\u7528\u6237\u8bed\u8a00\u504f\u597d"
+    },
+    "is_disabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "\u662f\u5426\u5df2\u505c\u7528"
+    }
+  }
+}

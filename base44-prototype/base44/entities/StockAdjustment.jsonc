@@ -1,0 +1,57 @@
+{
+  "name": "StockAdjustment",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u8c03\u6574\u65e5\u671f"
+    },
+    "sku_ref": {
+      "type": "string",
+      "description": "SKU\u4ea7\u54c1ID"
+    },
+    "sku_name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0(\u5197\u4f59)"
+    },
+    "warehouse": {
+      "type": "string",
+      "enum": [
+        "\u4e0a\u6d77\u4ed3",
+        "Tucson\u4ed3"
+      ],
+      "description": "\u4ed3\u5e93"
+    },
+    "before_qty": {
+      "type": "number",
+      "description": "\u8c03\u6574\u524d\u6570\u91cf"
+    },
+    "after_qty": {
+      "type": "number",
+      "description": "\u8c03\u6574\u540e\u6570\u91cf"
+    },
+    "difference": {
+      "type": "number",
+      "description": "\u5dee\u5f02(\u81ea\u52a8\u8ba1\u7b97)"
+    },
+    "reason": {
+      "type": "string",
+      "description": "\u539f\u56e0"
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "\u64cd\u4f5c\u5458ID"
+    },
+    "operator_name": {
+      "type": "string",
+      "description": "\u64cd\u4f5c\u5458\u59d3\u540d"
+    }
+  },
+  "required": [
+    "date",
+    "sku_ref",
+    "before_qty",
+    "after_qty"
+  ]
+}

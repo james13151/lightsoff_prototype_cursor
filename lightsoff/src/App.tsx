@@ -14,6 +14,7 @@ import { SettingsView } from './components/SettingsView'
 import { TeamView } from './components/TeamView'
 import { ThemeToggle } from './components/ThemeToggle'
 import { Reports } from './components/Reports'
+import { OmnichannelSetup } from './components/OmnichannelSetup'
 import { ROLE_LABELS } from './lib/permissions'
 
 export type View =
@@ -26,6 +27,7 @@ export type View =
   | 'rnd'
   | 'collab'
   | 'events'
+  | 'omnichannel'
   | 'team'
   | 'settings'
 
@@ -43,6 +45,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string; group: string }[] = 
   { view: 'marketing', label: 'Marketing', icon: '📣', group: 'Modules' },
   { view: 'rnd', label: 'R&D Kanban', icon: '🧪', group: 'Modules' },
   { view: 'collab', label: 'Internal Collab', icon: '🎫', group: 'Modules' },
+  { view: 'omnichannel', label: 'Omnichannel Setup', icon: '🔌', group: 'System' },
   { view: 'events', label: 'Event Bus', icon: '⚡', group: 'System' },
   { view: 'team', label: 'Team & permissions', icon: '👥', group: 'System' },
   { view: 'settings', label: 'AI Settings', icon: '⚙️', group: 'System' },
@@ -70,10 +73,12 @@ export default function App({
 
   const openTicketCount = state.tickets.filter((t) => t.status !== 'resolved').length
   const openConvCount = state.conversations.filter((c) => c.status === 'open').length
+  const incompleteChannelCount = state.channelAccounts.filter((account) => !(account.sendEnabled && account.receiveEnabled)).length
 
   const badgeFor = (view: View): number => {
     if (view === 'inbox') return openConvCount
     if (view === 'collab') return openTicketCount
+    if (view === 'omnichannel') return incompleteChannelCount
     return 0
   }
 
@@ -87,6 +92,7 @@ export default function App({
     case 'marketing': content = <Marketing />; break
     case 'rnd': content = <Kanban focusId={nav.focusId} />; break
     case 'collab': content = <Collab focusId={nav.focusId} />; break
+    case 'omnichannel': content = <OmnichannelSetup />; break
     case 'events': content = <EventBus />; break
     case 'team': content = <TeamView />; break
     case 'settings': content = <SettingsView />; break
@@ -97,7 +103,7 @@ export default function App({
   return (
     <div className="min-h-screen bg-bg text-ink">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-60 border-r border-line bg-surface">
+      <aside className="border-b border-line bg-surface md:fixed md:inset-y-0 md:left-0 md:w-60 md:border-b-0 md:border-r">
         <div className="flex items-center gap-2 px-5 py-5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">L</div>
           <div>
@@ -105,7 +111,7 @@ export default function App({
             <div className="text-[11px] text-ink-faint">AI operator · prototype</div>
           </div>
         </div>
-        <nav className="px-3 pb-44">
+        <nav className="px-3 pb-3 md:pb-44">
           {groups.map((group) => (
             <div key={group} className="mb-3">
               <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{group}</div>
@@ -133,7 +139,7 @@ export default function App({
             </div>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 border-t border-line-subtle px-3 py-3">
+        <div className="border-t border-line-subtle px-3 py-3 md:absolute md:bottom-0 md:left-0 md:right-0">
           <ThemeToggle compact />
           <div className="mt-2 px-2 text-[11px] text-ink-faint">
             {auth?.displayName ?? (mode === 'demo' ? 'Alex Chen' : 'User')}
@@ -155,9 +161,9 @@ export default function App({
       </aside>
 
       {/* Main */}
-      <div className="pl-60">
+      <div className="md:pl-60">
         <CaptureBar />
-        <main className="mx-auto max-w-5xl px-8 py-6">{content}</main>
+        <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 md:px-8 md:py-6">{content}</main>
       </div>
 
       {/* Toast */}

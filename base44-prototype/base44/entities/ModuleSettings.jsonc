@@ -1,0 +1,149 @@
+{
+  "name": "ModuleSettings",
+  "type": "object",
+  "properties": {
+    "visible_fields": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "boolean",
+          "default": true
+        },
+        "customer_contact": {
+          "type": "boolean",
+          "default": true
+        },
+        "tracking_number": {
+          "type": "boolean",
+          "default": true
+        },
+        "attachments": {
+          "type": "boolean",
+          "default": true
+        },
+        "due_date": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "description": "\u53ef\u89c1\u5b57\u6bb5\u914d\u7f6e"
+    },
+    "status_labels": {
+      "type": "object",
+      "description": "\u5de5\u5355\u72b6\u6001\u6807\u7b7e(\u65e7,\u4fdd\u7559\u517c\u5bb9)"
+    },
+    "priority_levels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\u4f18\u5148\u7ea7\u5217\u8868"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "\u54c1\u724cLogo\u56fe\u7247URL"
+    },
+    "operation_fee_rate": {
+      "type": "number",
+      "default": 5,
+      "description": "\u7f8e\u56fd\u4ed3\u6bcf\u5355\u64cd\u4f5c\u8d39 (\u00a5)"
+    },
+    "ticket_statuses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label_zh": {
+            "type": "string"
+          },
+          "label_en": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "\u5de5\u5355\u72b6\u6001\u81ea\u5b9a\u4e49\u5217\u8868"
+    },
+    "ticket_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label_zh": {
+            "type": "string"
+          },
+          "label_en": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "\u5de5\u5355\u7c7b\u578b\u81ea\u5b9a\u4e49\u5217\u8868"
+    },
+    "po_statuses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label_zh": {
+            "type": "string"
+          },
+          "label_en": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "\u91c7\u8d2d\u8ba2\u5355\u72b6\u6001\u81ea\u5b9a\u4e49\u5217\u8868"
+    },
+    "stock_statuses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label_zh": {
+            "type": "string"
+          },
+          "label_en": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "\u5e93\u5b58\u72b6\u6001\u81ea\u5b9a\u4e49\u5217\u8868"
+    },
+    "settlement_statuses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label_zh": {
+            "type": "string"
+          },
+          "label_en": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "\u7ed3\u7b97\u72b6\u6001\u81ea\u5b9a\u4e49\u5217\u8868"
+    }
+  },
+  "required": []
+}

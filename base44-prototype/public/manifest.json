@@ -1,0 +1,22 @@
+{
+  "name": "工单台",
+  "short_name": "工单台",
+  "description": "协同工作区 — 工单、库存、采购管理",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#242833",
+  "theme_color": "#242833",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%23242833'/><text x='96' y='135' font-size='100' text-anchor='middle' fill='%23D4AF37' font-family='sans-serif'>工</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23242833'/><text x='256' y='360' font-size='280' text-anchor='middle' fill='%23D4AF37' font-family='sans-serif'>工</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

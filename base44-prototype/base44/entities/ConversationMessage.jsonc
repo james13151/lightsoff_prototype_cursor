@@ -1,0 +1,98 @@
+{
+  "name": "ConversationMessage",
+  "type": "object",
+  "properties": {
+    "ticket_id": {
+      "type": "string",
+      "description": "Linked Ticket id"
+    },
+    "channel_account_id": {
+      "type": "string",
+      "description": "Linked ChannelAccount id"
+    },
+    "channel_type": {
+      "type": "string",
+      "enum": [
+        "email",
+        "facebook",
+        "instagram",
+        "whatsapp"
+      ],
+      "description": "Message channel"
+    },
+    "external_thread_id": {
+      "type": "string",
+      "description": "Provider thread/conversation id"
+    },
+    "external_message_id": {
+      "type": "string",
+      "description": "Provider message id"
+    },
+    "external_customer_id": {
+      "type": "string",
+      "description": "Provider customer id"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "inbound",
+        "outbound"
+      ],
+      "description": "Message direction"
+    },
+    "sender_name": {
+      "type": "string",
+      "description": "Display sender name"
+    },
+    "sender_contact": {
+      "type": "string",
+      "description": "Email, phone, or channel handle"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Email subject or generated message title"
+    },
+    "body_text": {
+      "type": "string",
+      "description": "Plain text body"
+    },
+    "body_html": {
+      "type": "string",
+      "description": "HTML body when available"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Attachment URLs or provider references"
+    },
+    "language": {
+      "type": "string",
+      "description": "Detected language"
+    },
+    "delivery_status": {
+      "type": "string",
+      "enum": [
+        "received",
+        "queued",
+        "sent",
+        "delivered",
+        "read",
+        "failed",
+        "blocked"
+      ],
+      "default": "received",
+      "description": "Delivery state"
+    },
+    "raw_payload": {
+      "type": "string",
+      "description": "Debug snapshot of provider payload"
+    }
+  },
+  "required": [
+    "channel_type",
+    "direction",
+    "body_text"
+  ]
+}

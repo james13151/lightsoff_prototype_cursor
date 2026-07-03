@@ -1,0 +1,122 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "sku_id": {
+      "type": "string",
+      "description": "SKU\u7f16\u53f7"
+    },
+    "name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0\uff08\u4e2d\u6587\uff09"
+    },
+    "name_en": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0\uff08\u82f1\u6587\uff09"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "\u7a7a\u6c14\u52a8\u529b",
+        "\u5185\u9970\u914d\u4ef6",
+        "\u8f6c\u5411\u7cfb\u7edf",
+        "\u811a\u57ab\u914d\u4ef6",
+        "\u5176\u4ed6"
+      ],
+      "description": "\u4ea7\u54c1\u7c7b\u578b"
+    },
+    "brand_line": {
+      "type": "string",
+      "enum": [
+        "MINI",
+        "VW",
+        "Volvo",
+        "Honda",
+        "Audi",
+        "Porsche",
+        "\u5176\u4ed6"
+      ],
+      "description": "\u54c1\u724c"
+    },
+    "vehicle_model": {
+      "type": "string",
+      "description": "\u8f66\u578b"
+    },
+    "material_spec": {
+      "type": "string",
+      "description": "\u6750\u8d28/\u89c4\u683c"
+    },
+    "drive_side": {
+      "type": "string",
+      "enum": [
+        "LHD",
+        "RHD",
+        "N/A"
+      ],
+      "description": "\u9a7e\u9a76\u4f4d"
+    },
+    "transmission": {
+      "type": "string",
+      "enum": [
+        "AT",
+        "MT",
+        "N/A"
+      ],
+      "description": "\u53d8\u901f\u7bb1"
+    },
+    "design_embroidery": {
+      "type": "string",
+      "description": "\u8bbe\u8ba1/\u523a\u7ee3"
+    },
+    "supplier_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\u5173\u8054\u4f9b\u5e94\u5546ID\u5217\u8868"
+    },
+    "supplier_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\u5173\u8054\u4f9b\u5e94\u5546\u540d\u79f0\u5217\u8868\uff08\u5197\u4f59\uff09"
+    },
+    "last_po_price": {
+      "type": "number",
+      "default": 0,
+      "description": "\u4e0a\u6b21\u91c7\u8d2d\u4ef7\uff08\u4eba\u6c11\u5e01\uff09"
+    },
+    "selling_price_usd": {
+      "type": "number",
+      "default": 0,
+      "description": "\u552e\u4ef7\uff08\u7f8e\u5143\uff09"
+    },
+    "keep_stock": {
+      "type": "boolean",
+      "default": true,
+      "description": "\u662f\u5426\u5907\u5e93\u5b58\uff08\u5426=\u6309\u9700\u751f\u4ea7\uff09"
+    },
+    "current_stock": {
+      "type": "number",
+      "default": 0,
+      "description": "\u5f53\u524d\u5e93\u5b58"
+    },
+    "safety_stock": {
+      "type": "number",
+      "default": 0,
+      "description": "\u5b89\u5168\u5e93\u5b58"
+    },
+    "warehouse_location": {
+      "type": "string",
+      "description": "\u4ed3\u4f4d"
+    },
+    "notes": {
+      "type": "string",
+      "description": "\u5907\u6ce8"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

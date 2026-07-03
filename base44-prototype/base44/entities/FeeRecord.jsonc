@@ -1,0 +1,57 @@
+{
+  "name": "FeeRecord",
+  "type": "object",
+  "properties": {
+    "outbound_record_ref": {
+      "type": "string",
+      "description": "\u5173\u8054\u51fa\u5e93\u8bb0\u5f55ID"
+    },
+    "partner_user_ref": {
+      "type": "string",
+      "description": "Partner\u7528\u6237ID"
+    },
+    "partner_name": {
+      "type": "string",
+      "description": "Partner\u59d3\u540d"
+    },
+    "sku_name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "\u51fa\u5e93\u6570\u91cf"
+    },
+    "unit_fee": {
+      "type": "number",
+      "description": "\u5355\u6b21\u8d39\u7387(\u5feb\u7167)"
+    },
+    "total_fee": {
+      "type": "number",
+      "description": "\u5e94\u6536\u91d1\u989d"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u64cd\u4f5c\u65e5\u671f"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "\u672a\u7ed3\u7b97",
+        "\u5df2\u7ed3\u7b97"
+      ],
+      "default": "\u672a\u7ed3\u7b97",
+      "description": "\u7ed3\u7b97\u72b6\u6001"
+    },
+    "settlement_record_ref": {
+      "type": "string",
+      "description": "\u5173\u8054\u7ed3\u7b97\u8bb0\u5f55ID"
+    }
+  },
+  "required": [
+    "outbound_record_ref",
+    "partner_user_ref",
+    "date"
+  ]
+}

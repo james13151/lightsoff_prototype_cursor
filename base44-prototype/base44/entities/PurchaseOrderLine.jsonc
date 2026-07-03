@@ -1,0 +1,46 @@
+{
+  "name": "PurchaseOrderLine",
+  "type": "object",
+  "properties": {
+    "po_ref": {
+      "type": "string",
+      "description": "\u5173\u8054\u91c7\u8d2d\u5355ID"
+    },
+    "po_number": {
+      "type": "string",
+      "description": "\u91c7\u8d2d\u5355\u53f7(\u5197\u4f59)"
+    },
+    "sku_ref": {
+      "type": "string",
+      "description": "SKU\u4ea7\u54c1ID(\u53ef\u9009)"
+    },
+    "product_name": {
+      "type": "string",
+      "description": "\u4ea7\u54c1\u540d\u79f0"
+    },
+    "embroidery_note": {
+      "type": "string",
+      "description": "\u7ee3\u82b1/\u5907\u6ce8"
+    },
+    "quantity": {
+      "type": "number",
+      "default": 1,
+      "description": "\u6570\u91cf"
+    },
+    "unit_price_cny": {
+      "type": "number",
+      "default": 0,
+      "description": "\u5355\u4ef7(\u4eba\u6c11\u5e01)"
+    },
+    "line_total": {
+      "type": "number",
+      "default": 0,
+      "description": "\u5c0f\u8ba1(\u81ea\u52a8)"
+    }
+  },
+  "required": [
+    "po_ref",
+    "product_name",
+    "quantity"
+  ]
+}
