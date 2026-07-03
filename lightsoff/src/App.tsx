@@ -11,6 +11,8 @@ import { Kanban } from './components/Kanban'
 import { Collab } from './components/Collab'
 import { EventBus } from './components/EventBus'
 import { SettingsView } from './components/SettingsView'
+import { TeamView } from './components/TeamView'
+import { ROLE_LABELS } from './lib/permissions'
 
 export type View =
   | 'digest'
@@ -21,6 +23,7 @@ export type View =
   | 'rnd'
   | 'collab'
   | 'events'
+  | 'team'
   | 'settings'
 
 export interface Nav {
@@ -37,6 +40,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string; group: string }[] = 
   { view: 'rnd', label: 'R&D Kanban', icon: '🧪', group: 'Modules' },
   { view: 'collab', label: 'Internal Collab', icon: '🎫', group: 'Modules' },
   { view: 'events', label: 'Event Bus', icon: '⚡', group: 'System' },
+  { view: 'team', label: 'Team & permissions', icon: '👥', group: 'System' },
   { view: 'settings', label: 'AI Settings', icon: '⚙️', group: 'System' },
 ]
 
@@ -49,7 +53,7 @@ export default function App({
   mode: 'demo' | 'live'
   onDisconnect: () => void
 }) {
-  const { state, dispatch, loading } = useStore()
+  const { state, dispatch, loading, role } = useStore()
   const [nav, setNav] = useState<Nav>({ view: 'digest' })
 
   useEffect(() => {
@@ -79,6 +83,7 @@ export default function App({
     case 'rnd': content = <Kanban focusId={nav.focusId} />; break
     case 'collab': content = <Collab focusId={nav.focusId} />; break
     case 'events': content = <EventBus />; break
+    case 'team': content = <TeamView />; break
     case 'settings': content = <SettingsView />; break
   }
 
@@ -123,6 +128,11 @@ export default function App({
         </nav>
         <div className="absolute bottom-0 left-0 right-0 border-t border-slate-100 px-5 py-3">
           <div className="text-[11px] text-slate-400">
+            {auth?.displayName ?? (mode === 'demo' ? 'Alex Chen' : 'User')}
+            {' · '}
+            <span className="font-medium text-slate-600">{ROLE_LABELS[role]}</span>
+          </div>
+          <div className="mt-0.5 text-[11px] text-slate-400">
             Tenant: <span className="font-medium text-slate-600">{auth?.tenantName ?? 'demo (in-memory)'}</span>
           </div>
           <div className={`mt-0.5 text-[11px] ${mode === 'live' ? 'text-emerald-600' : 'text-amber-600'}`}>

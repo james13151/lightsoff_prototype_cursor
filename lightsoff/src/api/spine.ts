@@ -89,7 +89,17 @@ export function adaptSpineData(raw: {
     code: w.code,
     name: w.name,
     isDefault: Boolean(w.is_default),
-    address: w.address ?? {},
+    contactName: w.contact_name ?? undefined,
+    contactEmail: w.contact_email ?? undefined,
+    contactPhone: w.contact_phone ?? undefined,
+    address: w.address ? {
+      line1: w.address.line1 ?? undefined,
+      line2: w.address.line2 ?? undefined,
+      city: w.address.city ?? undefined,
+      state: w.address.state ?? undefined,
+      postalCode: w.address.postal_code ?? undefined,
+      country: w.address.country ?? undefined,
+    } : undefined,
   }))
 
   const stockByWarehouse: StockByWarehouse[] = raw.stockByWarehouse.map((s) => ({
@@ -140,7 +150,11 @@ export function adaptSpineData(raw: {
     id: v.id,
     name: v.name,
     leadTimeDays: v.lead_time_days ?? 14,
-    isRecurring: true,
+    isRecurring: v.is_recurring ?? true,
+    contactEmail: v.contact_email ?? undefined,
+    phone: v.phone ?? undefined,
+    paymentTerms: v.payment_terms ?? undefined,
+    notes: v.notes ?? undefined,
   }))
 
   const purchaseOrders: PurchaseOrder[] = raw.purchaseOrders.map((po) => ({

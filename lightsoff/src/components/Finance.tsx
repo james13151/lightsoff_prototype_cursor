@@ -47,7 +47,7 @@ const FIN_TABS: { id: FinTab; label: string }[] = [
 ]
 
 export function Finance() {
-  const { state, dispatch, spineMutate, auth, mode } = useStore()
+  const { state, dispatch, spineMutate, auth, mode, can } = useStore()
   const [tab, setTab] = useState<FinTab>('overview')
   const { cash, revenue30d, expenses30d } = cashPosition(state)
   const vendorName = (id: string) => state.vendors.find((v) => v.id === id)?.name ?? '—'
@@ -309,7 +309,7 @@ export function Finance() {
                     </Badge>
                     <span className="text-sm text-slate-600">{vendorName(b.vendorId)} — {b.memo}</span>
                     <span className="ml-auto text-sm font-semibold">${b.amount.toFixed(2)}</span>
-                    {b.status !== 'paid' && !b.anomaly && (
+                    {b.status !== 'paid' && !b.anomaly && can('finance.pay_bill') && (
                       <Button variant="secondary" onClick={() => dispatch({ type: 'PAY_BILL', billId: b.id })}>Pay</Button>
                     )}
                   </div>
@@ -331,13 +331,16 @@ export function Finance() {
                       Payments: {b.payments.map((p) => `$${p.amount.toFixed(2)}`).join(', ')}
                     </div>
                   )}
-                  {b.anomaly && (
+                  {b.anomaly && can('finance.approve_claim') && (
                     <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-rose-50 px-3 py-2">
                       <span className="text-sm text-rose-700">⚠ {b.anomaly}</span>
                       <Button variant="secondary" onClick={() => dispatch({ type: 'APPROVE_BILL_ANOMALY', billId: b.id })}>
                         Reviewed — approve
                       </Button>
                     </div>
+                  )}
+                  {b.anomaly && !can('finance.approve_claim') && (
+                    <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">⚠ {b.anomaly}</div>
                   )}
                 </Card>
               )
@@ -348,6 +351,7 @@ export function Finance() {
 
       {tab === 'payments' && (
         <div className="space-y-4">
+          {can('finance.pay_bill') && (
           <form onSubmit={onRecordPayment}>
             <FormPanel title="Record payment (multi-bill allocations)">
               <Field label="Vendor">
@@ -388,6 +392,7 @@ export function Finance() {
               <Button type="submit" className="w-full" disabled={openBills.length === 0 || payTotal <= 0}>Record payment</Button>
             </FormPanel>
           </form>
+          )}
 
           <div className="space-y-2.5">
             {state.payments.length === 0 ? (
@@ -428,7 +433,7 @@ export function Finance() {
                 </Field>
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" checked={claimAutoApprove} onChange={(e) => setClaimAutoApprove(e.target.checked)} />
+                <input type="checkbox" checked={claimAutoApprove} onChange={(e) => setClaimAutoApprove(e.target.checked)} disabled={!can('finance.approve_claim')} />
                 Approve immediately (posts to journal)
               </label>
               <Button type="submit" className="w-full">Submit claim</Button>
@@ -446,7 +451,7 @@ export function Finance() {
                   <span className="text-sm text-slate-600">{c.vendorName} → {c.category}</span>
                   <ConfidenceBadge value={c.confidence} />
                   <span className="ml-auto text-sm font-semibold">${c.amount.toFixed(2)}</span>
-                  {c.status === 'pending_review' && (
+                  {c.status === 'pending_review' && can('finance.approve_claim') && (
                     <>
                       <Button variant="secondary" onClick={() => dispatch({ type: 'APPROVE_CLAIM', claimId: c.id })}>Approve</Button>
                       <Button variant="ghost" onClick={() => dispatch({ type: 'REJECT_CLAIM', claimId: c.id })}>Reject</Button>
@@ -461,6 +466,7 @@ export function Finance() {
 
       {tab === 'journal' && (
         <div className="space-y-4">
+          {can('finance.post_journal') && (
           <form onSubmit={onCreateJournal}>
             <FormPanel title="Journal entry">
               <Field label="Memo">
@@ -500,6 +506,7 @@ export function Finance() {
               <Button type="submit" className="w-full" disabled={!jeBalanced}>Post journal entry</Button>
             </FormPanel>
           </form>
+          )}
 
           <div className="space-y-2.5">
             {state.journal.length === 0 ? (

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { apiFetch, checkApiHealth, fetchDevToken } from '../api/client'
 import { API_URL, DEV_USER_ID, type AuthSession } from '../api/config'
+import { fetchMe } from '../api/members'
 import { Button, Card } from './ui'
 
 interface TenantRow {
@@ -83,9 +84,26 @@ export function ConnectScreen({ onConnect }: { onConnect: (session: AuthSession)
     }
   }
 
-  const enter = (t: TenantRow) => {
+  const enter = async (t: TenantRow) => {
     if (!token) return
-    onConnect({ token, userId, tenantId: t.id, tenantName: t.name })
+    setBusy(true)
+    setError(null)
+    try {
+      const me = await fetchMe(token, t.id)
+      onConnect({
+        token,
+        userId,
+        tenantId: t.id,
+        tenantName: t.name,
+        role: me.role,
+        displayName: me.display_name,
+        email: me.email,
+      })
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -131,7 +149,7 @@ export function ConnectScreen({ onConnect }: { onConnect: (session: AuthSession)
                 <p className="text-sm font-medium text-slate-700">Choose workspace</p>
                 {tenants.map((t) => (
                   <div key={t.id} className="flex items-center gap-2">
-                    <Button className="flex-1" variant="secondary" onClick={() => enter(t)}>
+                    <Button className="flex-1" variant="secondary" onClick={() => void enter(t)} disabled={busy}>
                       {t.name} <span className="text-slate-400">({t.role})</span>
                     </Button>
                     <Button variant="ghost" onClick={() => void seedStarter(t.id)} title="Add Acme vendor + Blue Hoodie SKU">

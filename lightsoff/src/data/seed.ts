@@ -2,6 +2,7 @@ import type {
   Vendor, Warehouse, StockByWarehouse, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
 } from '../types'
+import type { TeamMember } from '../api/members'
 
 const daysAgo = (n: number) => {
   const d = new Date()
@@ -14,16 +15,51 @@ const daysFromNow = (n: number) => {
   return d.toISOString()
 }
 
+export const teamMembers: TeamMember[] = [
+  {
+    tenantId: 'demo',
+    userId: '11111111-1111-1111-1111-111111111111',
+    role: 'owner',
+    displayName: 'Alex Chen',
+    email: 'alex@brand.com',
+    joinedAt: daysAgo(90),
+  },
+  {
+    tenantId: 'demo',
+    userId: '22222222-2222-2222-2222-222222222222',
+    role: 'admin',
+    displayName: 'Sam Rivera',
+    email: 'sam@brand.com',
+    joinedAt: daysAgo(60),
+  },
+  {
+    tenantId: 'demo',
+    userId: '33333333-3333-3333-3333-333333333333',
+    role: 'member',
+    displayName: 'Jordan Lee',
+    email: 'jordan@brand.com',
+    joinedAt: daysAgo(14),
+  },
+]
+
 export const vendors: Vendor[] = [
-  { id: 'v1', name: 'Acme Textiles', leadTimeDays: 12, isRecurring: true },
-  { id: 'v2', name: 'Pacific Trims Co.', leadTimeDays: 8, isRecurring: true },
-  { id: 'v3', name: 'Northwind Packaging', leadTimeDays: 5, isRecurring: true },
-  { id: 'v4', name: 'Kyoto Fabric Lab', leadTimeDays: 21, isRecurring: false },
+  { id: 'v1', name: 'Acme Textiles', leadTimeDays: 12, isRecurring: true, contactEmail: 'orders@acmetextiles.com', phone: '+1 415-555-0101', paymentTerms: 'Net 30' },
+  { id: 'v2', name: 'Pacific Trims Co.', leadTimeDays: 8, isRecurring: true, contactEmail: 'ap@pacifictrims.com', phone: '+1 213-555-0182', paymentTerms: 'Net 15' },
+  { id: 'v3', name: 'Northwind Packaging', leadTimeDays: 5, isRecurring: true, contactEmail: 'billing@northwindpkg.com', phone: '+1 503-555-0144', paymentTerms: 'Due on receipt' },
+  { id: 'v4', name: 'Kyoto Fabric Lab', leadTimeDays: 21, isRecurring: false, contactEmail: 'hello@kyotofabric.jp', phone: '+81 75-555-0199', paymentTerms: '50% deposit, Net 30' },
 ]
 
 export const warehouses: Warehouse[] = [
-  { id: 'wh-main', code: 'MAIN', name: 'Main warehouse', isDefault: true },
-  { id: 'wh-3pl', code: '3PL-EAST', name: 'East coast 3PL', isDefault: false },
+  {
+    id: 'wh-main', code: 'MAIN', name: 'Main warehouse', isDefault: true,
+    contactName: 'Receiving desk', contactEmail: 'receiving@brand.com', contactPhone: '+1 415-555-0200',
+    address: { line1: '1200 Market St', city: 'San Francisco', state: 'CA', postalCode: '94103', country: 'US' },
+  },
+  {
+    id: 'wh-3pl', code: '3PL-EAST', name: 'East coast 3PL', isDefault: false,
+    contactName: 'Fulfillment ops', contactEmail: 'ops@3pleast.com', contactPhone: '+1 732-555-0300',
+    address: { line1: '88 Industrial Pkwy', line2: 'Unit 4', city: 'Newark', state: 'NJ', postalCode: '07114', country: 'US' },
+  },
 ]
 
 export const stockByWarehouse: StockByWarehouse[] = [
@@ -47,19 +83,19 @@ export const products: Product[] = [
 
 export const purchaseOrders: PurchaseOrder[] = [
   {
-    id: 'PO-1042', vendorId: 'v1', status: 'sent', createdAt: daysAgo(6), source: 'ai_capture',
+    id: 'PO-1042', poNumber: 'PO-1042', vendorId: 'v1', status: 'sent', createdAt: daysAgo(6), source: 'ai_capture',
     lines: [
-      { productId: 'p1', qty: 60, unitCost: 18.5 },
-      { productId: 'p2', qty: 40, unitCost: 18.5 },
+      { id: 'pl-1', productId: 'p1', qty: 60, unitCost: 18.5, receivedQty: 0 },
+      { id: 'pl-2', productId: 'p2', qty: 40, unitCost: 18.5, receivedQty: 0 },
     ],
   },
   {
-    id: 'PO-1041', vendorId: 'v2', status: 'received', createdAt: daysAgo(14), source: 'manual',
-    lines: [{ productId: 'p5', qty: 100, unitCost: 5.6 }],
+    id: 'PO-1041', poNumber: 'PO-1041', vendorId: 'v2', status: 'received', createdAt: daysAgo(14), source: 'manual',
+    lines: [{ id: 'pl-3', productId: 'p5', qty: 100, unitCost: 5.6, receivedQty: 97 }],
   },
   {
-    id: 'PO-1040', vendorId: 'v3', status: 'received', createdAt: daysAgo(21), source: 'ai_capture',
-    lines: [{ productId: 'p6', qty: 50, unitCost: 3.9 }],
+    id: 'PO-1040', poNumber: 'PO-1040', vendorId: 'v3', status: 'received', createdAt: daysAgo(21), source: 'ai_capture',
+    lines: [{ id: 'pl-4', productId: 'p6', qty: 50, unitCost: 3.9, receivedQty: 50 }],
   },
 ]
 

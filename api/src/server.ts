@@ -4,6 +4,7 @@ import { requireAuth } from './auth.js'
 import { withUser } from './db.js'
 import { inventoryRoutes } from './routes/inventory.js'
 import { financeRoutes } from './routes/finance.js'
+import { memberRoutes } from './routes/members.js'
 import { registerDevAuth } from './devAuth.js'
 import { env } from './env.js'
 
@@ -25,6 +26,7 @@ export function buildServer() {
 
     inventoryRoutes(authed)
     financeRoutes(authed)
+    memberRoutes(authed)
 
     // ---- Tenants ----
 
@@ -64,19 +66,19 @@ export function buildServer() {
       })
     })
 
-    authed.post<{ Body: { tenant_id: string; name: string; lead_time_days?: number; contact_email?: string } }>(
+    authed.post<{ Body: { tenant_id: string; name: string; lead_time_days?: number; contact_email?: string; phone?: string; payment_terms?: string; notes?: string; is_recurring?: boolean } }>(
       '/v1/vendors',
       async (req, reply) => {
-        const { tenant_id, name, lead_time_days, contact_email } = req.body ?? {}
+        const { tenant_id, name, lead_time_days, contact_email, phone, payment_terms, notes, is_recurring } = req.body ?? {}
         if (!tenant_id || !name?.trim()) {
           return reply.code(400).send({ error: 'tenant_id and name are required' })
         }
         try {
           const vendor = await withUser(req.userId, async (db) => {
             const r = await db.query(
-              `insert into app.vendors (tenant_id, name, lead_time_days, contact_email)
-               values ($1, $2, $3, $4) returning *`,
-              [tenant_id, name.trim(), lead_time_days ?? null, contact_email ?? null],
+              `insert into app.vendors (tenant_id, name, lead_time_days, contact_email, phone, payment_terms, notes, is_recurring)
+               values ($1, $2, $3, $4, $5, $6, $7, coalesce($8, true)) returning *`,
+              [tenant_id, name.trim(), lead_time_days ?? null, contact_email ?? null, phone ?? null, payment_terms ?? null, notes ?? null, is_recurring ?? null],
             )
             return r.rows[0]
           })
@@ -90,6 +92,38 @@ export function buildServer() {
         }
       },
     )
+
+    authed.patch<{
+      Params: { id: string }
+      Body: { name?: string; lead_time_days?: number; contact_email?: string; phone?: string; payment_terms?: string; notes?: string; is_recurring?: boolean }
+    }>('/v1/vendors/:id', async (req, reply) => {
+      const { name, lead_time_days, contact_email, phone, payment_terms, notes, is_recurring } = req.body ?? {}
+      try {
+        const vendor = await withUser(req.userId, async (db) => {
+          const r = await db.query(
+            `update app.vendors set
+               name = coalesce($2, name),
+               lead_time_days = coalesce($3, lead_time_days),
+               contact_email = coalesce($4, contact_email),
+               phone = coalesce($5, phone),
+               payment_terms = coalesce($6, payment_terms),
+               notes = coalesce($7, notes),
+               is_recurring = coalesce($8, is_recurring),
+               updated_at = now()
+             where id = $1 returning *`,
+            [req.params.id, name?.trim() ?? null, lead_time_days ?? null, contact_email ?? null, phone ?? null, payment_terms ?? null, notes ?? null, is_recurring ?? null],
+          )
+          return r.rows[0]
+        })
+        if (!vendor) return reply.code(404).send({ error: 'vendor not found' })
+        return vendor
+      } catch (err: unknown) {
+        if ((err as { code?: string }).code === '42501') {
+          return reply.code(403).send({ error: 'not a member of this tenant' })
+        }
+        throw err
+      }
+    })
 
     // ---- Event bus ----
 

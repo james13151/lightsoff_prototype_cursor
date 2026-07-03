@@ -2,11 +2,24 @@
 
 export type Confidence = number // 0..1
 
+export interface LocationAddress {
+  line1?: string
+  line2?: string
+  city?: string
+  state?: string
+  postalCode?: string
+  country?: string
+}
+
 export interface Vendor {
   id: string
   name: string
   leadTimeDays: number
   isRecurring: boolean
+  contactEmail?: string
+  phone?: string
+  paymentTerms?: string
+  notes?: string
 }
 
 export interface Warehouse {
@@ -14,7 +27,10 @@ export interface Warehouse {
   code: string
   name: string
   isDefault: boolean
-  address?: Record<string, unknown>
+  contactName?: string
+  contactEmail?: string
+  contactPhone?: string
+  address?: LocationAddress
 }
 
 export interface StockByWarehouse {
