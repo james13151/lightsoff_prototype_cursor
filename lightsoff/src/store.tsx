@@ -238,9 +238,19 @@ function reducer(state: AppState, action: Action): AppState {
               : next.setupStatus
         return { ...next, setupStatus }
       })
+      const channelAccount = channelAccounts.find((account) => account.channel === action.channel)
+      const conversations = channelAccount?.sendEnabled && channelAccount.receiveEnabled
+        ? state.conversations.map((conversation) =>
+            conversation.channel === action.channel &&
+            (conversation.sendPolicyState === 'needs_secrets' || conversation.sendPolicyState === 'receive_only')
+              ? { ...conversation, sendPolicyState: 'ready' as const }
+              : conversation,
+          )
+        : state.conversations
       return {
         ...state,
         channelAccounts,
+        conversations,
         connectorTestRuns: [run, ...state.connectorTestRuns],
         events: pushEvent(state, `connector.${action.testType}.${action.status}`, 'Inbox', `${action.channel} ${action.testType} test: ${action.message}`),
         toast: `${action.channel} ${action.testType} test recorded.`,

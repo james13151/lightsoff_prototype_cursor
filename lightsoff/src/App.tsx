@@ -103,7 +103,7 @@ export default function App({
   return (
     <div className="min-h-screen bg-bg text-ink">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-60 border-r border-line bg-surface">
+      <aside className="border-b border-line bg-surface md:fixed md:inset-y-0 md:left-0 md:w-60 md:border-b-0 md:border-r">
         <div className="flex items-center gap-2 px-5 py-5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">L</div>
           <div>
@@ -111,7 +111,7 @@ export default function App({
             <div className="text-[11px] text-ink-faint">AI operator · prototype</div>
           </div>
         </div>
-        <nav className="px-3 pb-44">
+        <nav className="px-3 pb-3 md:pb-44">
           {groups.map((group) => (
             <div key={group} className="mb-3">
               <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{group}</div>
@@ -139,7 +139,7 @@ export default function App({
             </div>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 border-t border-line-subtle px-3 py-3">
+        <div className="border-t border-line-subtle px-3 py-3 md:absolute md:bottom-0 md:left-0 md:right-0">
           <ThemeToggle compact />
           <div className="mt-2 px-2 text-[11px] text-ink-faint">
             {auth?.displayName ?? (mode === 'demo' ? 'Alex Chen' : 'User')}
@@ -161,9 +161,9 @@ export default function App({
       </aside>
 
       {/* Main */}
-      <div className="pl-60">
+      <div className="md:pl-60">
         <CaptureBar />
-        <main className="mx-auto max-w-5xl px-8 py-6">{content}</main>
+        <main className="mx-auto max-w-5xl px-4 py-4 sm:px-6 md:px-8 md:py-6">{content}</main>
       </div>
 
       {/* Toast */}
