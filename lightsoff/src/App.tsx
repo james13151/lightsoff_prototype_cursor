@@ -12,6 +12,7 @@ import { Collab } from './components/Collab'
 import { EventBus } from './components/EventBus'
 import { SettingsView } from './components/SettingsView'
 import { TeamView } from './components/TeamView'
+import { ThemeToggle } from './components/ThemeToggle'
 import { ROLE_LABELS } from './lib/permissions'
 
 export type View =
@@ -90,20 +91,20 @@ export default function App({
   const groups = ['Surfaces', 'Modules', 'System']
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-bg text-ink">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-60 border-r border-slate-200 bg-white">
+      <aside className="fixed inset-y-0 left-0 w-60 border-r border-line bg-surface">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">L</div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">L</div>
           <div>
             <div className="text-sm font-semibold leading-tight">LightsOff</div>
-            <div className="text-[11px] text-slate-400">AI operator · prototype</div>
+            <div className="text-[11px] text-ink-faint">AI operator · prototype</div>
           </div>
         </div>
-        <nav className="px-3">
+        <nav className="px-3 pb-44">
           {groups.map((group) => (
             <div key={group} className="mb-3">
-              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group}</div>
+              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{group}</div>
               {NAV_ITEMS.filter((i) => i.group === group).map((item) => {
                 const active = nav.view === item.view
                 const badge = badgeFor(item.view)
@@ -112,7 +113,9 @@ export default function App({
                     key={item.view}
                     onClick={() => navigate(item.view)}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors cursor-pointer ${
-                      active ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:bg-slate-50'
+                      active
+                        ? 'bg-highlight font-medium text-highlight-fg'
+                        : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
                     }`}
                   >
                     <span className="text-sm">{item.icon}</span>
@@ -126,20 +129,21 @@ export default function App({
             </div>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 border-t border-slate-100 px-5 py-3">
-          <div className="text-[11px] text-slate-400">
+        <div className="absolute bottom-0 left-0 right-0 border-t border-line-subtle px-3 py-3">
+          <ThemeToggle compact />
+          <div className="mt-2 px-2 text-[11px] text-ink-faint">
             {auth?.displayName ?? (mode === 'demo' ? 'Alex Chen' : 'User')}
             {' · '}
-            <span className="font-medium text-slate-600">{ROLE_LABELS[role]}</span>
+            <span className="font-medium text-ink-muted">{ROLE_LABELS[role]}</span>
           </div>
-          <div className="mt-0.5 text-[11px] text-slate-400">
-            Tenant: <span className="font-medium text-slate-600">{auth?.tenantName ?? 'demo (in-memory)'}</span>
+          <div className="mt-0.5 px-2 text-[11px] text-ink-faint">
+            Tenant: <span className="font-medium text-ink-muted">{auth?.tenantName ?? 'demo (in-memory)'}</span>
           </div>
-          <div className={`mt-0.5 text-[11px] ${mode === 'live' ? 'text-emerald-600' : 'text-amber-600'}`}>
+          <div className={`mt-0.5 px-2 text-[11px] ${mode === 'live' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
             ● {mode === 'live' ? (loading ? 'Syncing with API…' : 'Live — Inventory + Finance from DB') : 'Demo mode — in-memory seed data'}
           </div>
           {mode === 'live' && (
-            <button onClick={onDisconnect} className="mt-1 text-[11px] text-slate-400 underline cursor-pointer">
+            <button onClick={onDisconnect} className="mt-1 px-2 text-[11px] text-ink-faint underline cursor-pointer hover:text-ink-muted">
               Disconnect
             </button>
           )}
@@ -154,7 +158,7 @@ export default function App({
 
       {/* Toast */}
       {state.toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-highlight px-4 py-2.5 text-sm text-highlight-fg shadow-lg ring-1 ring-accent/30">
           {state.toast}
         </div>
       )}

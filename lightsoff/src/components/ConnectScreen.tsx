@@ -4,6 +4,7 @@ import { API_URL, DEV_USER_ID, isSupabaseConfigured, type AuthSession } from '..
 import { fetchMe } from '../api/members'
 import { getSupabase } from '../lib/supabase'
 import { Button, Card } from './ui'
+import { ThemeToggle } from './ThemeToggle'
 
 interface TenantRow {
   id: string
@@ -147,10 +148,13 @@ export function ConnectScreen({ onConnect }: { onConnect: (session: AuthSession)
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-bg p-6">
+      <div className="mb-4">
+        <ThemeToggle />
+      </div>
       <Card className="w-full max-w-md p-6">
-        <h1 className="text-lg font-semibold">Connect to LightsOff</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-lg font-semibold text-ink">Connect to LightsOff</h1>
+        <p className="mt-1 text-sm text-ink-muted">
           Spine modules (Inventory + Finance) load from the real database. Inbox, Marketing, and R&D stay in demo mode until Phase 2/3.
         </p>
         <p className="mt-2 font-mono text-xs text-slate-400">API: {API_URL}</p>

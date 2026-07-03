@@ -5,6 +5,9 @@ import App from './App'
 import { StoreProvider } from './store'
 import { ConnectScreen } from './components/ConnectScreen'
 import { clearAuth, isApiMode, loadAuth, saveAuth, type AuthSession } from './api/config'
+import { initTheme } from './lib/theme'
+
+initTheme()
 
 function Root() {
   const [auth, setAuth] = useState<AuthSession | null>(() => (isApiMode ? loadAuth() : null))
