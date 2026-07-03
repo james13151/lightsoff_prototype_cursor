@@ -21,14 +21,30 @@ export interface DbSession {
  * (set_config(..., true) = transaction-local, wiped at COMMIT/ROLLBACK).
  */
 export async function withUser<T>(userId: string, fn: (db: DbSession) => Promise<T>): Promise<T> {
+  return withSession({ userId, encryptionKey: env.encryptionKey }, fn)
+}
+
+/** Webhook / system paths that need vault access without a user JWT. */
+export async function withEncryptionKey<T>(fn: (db: DbSession) => Promise<T>): Promise<T> {
+  return withSession({ encryptionKey: env.encryptionKey }, fn)
+}
+
+async function withSession<T>(
+  opts: { userId?: string; encryptionKey: string },
+  fn: (db: DbSession) => Promise<T>,
+): Promise<T> {
   const client = await pool.connect()
   try {
     await client.query('begin')
-    await client.query(
-      `select set_config('request.jwt.claims', $1, true),
-              set_config('app.encryption_key', $2, true)`,
-      [JSON.stringify({ sub: userId }), env.encryptionKey],
-    )
+    if (opts.userId) {
+      await client.query(
+        `select set_config('request.jwt.claims', $1, true),
+                set_config('app.encryption_key', $2, true)`,
+        [JSON.stringify({ sub: opts.userId }), opts.encryptionKey],
+      )
+    } else {
+      await client.query(`select set_config('app.encryption_key', $1, true)`, [opts.encryptionKey])
+    }
     const result = await fn({ query: (text, values) => client.query(text, values) })
     await client.query('commit')
     return result
