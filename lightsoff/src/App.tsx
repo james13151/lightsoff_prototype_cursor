@@ -12,10 +12,12 @@ import { Collab } from './components/Collab'
 import { EventBus } from './components/EventBus'
 import { SettingsView } from './components/SettingsView'
 import { TeamView } from './components/TeamView'
+import { Reports } from './components/Reports'
 import { ROLE_LABELS } from './lib/permissions'
 
 export type View =
   | 'digest'
+  | 'reports'
   | 'inventory'
   | 'finance'
   | 'inbox'
@@ -33,6 +35,7 @@ export interface Nav {
 
 const NAV_ITEMS: { view: View; label: string; icon: string; group: string }[] = [
   { view: 'digest', label: 'Daily Digest', icon: '☀️', group: 'Surfaces' },
+  { view: 'reports', label: 'Reports', icon: '📊', group: 'Surfaces' },
   { view: 'inventory', label: 'Inventory & Procurement', icon: '📦', group: 'Modules' },
   { view: 'finance', label: 'Finance', icon: '💰', group: 'Modules' },
   { view: 'inbox', label: 'Unified Inbox', icon: '💬', group: 'Modules' },
@@ -76,6 +79,7 @@ export default function App({
   let content
   switch (nav.view) {
     case 'digest': content = <Digest navigate={navigate} />; break
+    case 'reports': content = <Reports />; break
     case 'inventory': content = <Inventory />; break
     case 'finance': content = <Finance />; break
     case 'inbox': content = <Inbox focusId={nav.focusId} />; break
