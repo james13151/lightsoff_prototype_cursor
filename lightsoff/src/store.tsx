@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useReducer, useState
 import type {
   Vendor, Warehouse, StockByWarehouse, Product, ProductMaster, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill, VendorPayment,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
-  Settings, CaptureDraft, CardStage, LocationAddress,
+  Settings, CaptureDraft, CardStage, LocationAddress, ChannelAccount, ConnectorTestRun, AiDraftRecord,
 } from './types'
 import * as seed from './data/seed'
 import type { AuthSession } from './api/config'
@@ -26,6 +26,9 @@ export interface AppState {
   journal: JournalEntry[]
   claims: ExpenseClaim[]
   campaigns: Campaign[]
+  channelAccounts: ChannelAccount[]
+  connectorTestRuns: ConnectorTestRun[]
+  aiDrafts: AiDraftRecord[]
   conversations: Conversation[]
   cards: KanbanCard[]
   tickets: Ticket[]
@@ -51,6 +54,9 @@ const initialState: AppState = {
   journal: seed.journal,
   claims: seed.claims,
   campaigns: seed.campaigns,
+  channelAccounts: seed.channelAccounts,
+  connectorTestRuns: seed.connectorTestRuns,
+  aiDrafts: seed.aiDrafts,
   conversations: seed.conversations,
   cards: seed.cards,
   tickets: seed.tickets,
@@ -63,6 +69,8 @@ const initialState: AppState = {
 
 type Action =
   | { type: 'APPROVE_REPLY'; convId: string; body: string }
+  | { type: 'DISCARD_AI_DRAFT'; draftId: string }
+  | { type: 'RECORD_CONNECTOR_TEST'; channel: ChannelAccount['channel']; testType: ConnectorTestRun['testType']; status: ConnectorTestRun['status']; message: string }
   | { type: 'PAY_BILL'; billId: string }
   | { type: 'APPROVE_BILL_ANOMALY'; billId: string }
   | { type: 'APPROVE_CLAIM'; claimId: string }
@@ -156,22 +164,86 @@ function bumpStock(
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'APPROVE_REPLY': {
+      const sentAt = now()
       const conversations = state.conversations.map((c) =>
         c.id === action.convId
           ? {
               ...c,
               status: 'answered' as const,
               aiDraft: null,
-              messages: [...c.messages, { id: nid('m'), from: 'brand' as const, body: action.body, at: now() }],
+              sendPolicyState: 'ready' as const,
+              messages: [...c.messages, { id: nid('m'), from: 'brand' as const, body: action.body, at: sentAt }],
             }
           : c,
       )
       const conv = state.conversations.find((c) => c.id === action.convId)
+      const aiDrafts = state.aiDrafts.map((draft) =>
+        draft.conversationId === action.convId && draft.approvalState === 'draft'
+          ? { ...draft, approvalState: 'sent' as const, approvedAt: sentAt, sentAt, body: action.body }
+          : draft,
+      )
+      const channelAccounts = state.channelAccounts.map((account) =>
+        account.channel === conv?.channel
+          ? { ...account, lastOutboundAt: sentAt }
+          : account,
+      )
       return {
         ...state,
         conversations,
+        aiDrafts,
+        channelAccounts,
         events: pushEvent(state, 'inbox.reply_sent', 'Inbox', `Reply sent to ${conv?.customerName ?? 'customer'} (AI draft approved)`),
         toast: 'Reply sent.',
+      }
+    }
+    case 'DISCARD_AI_DRAFT':
+      return {
+        ...state,
+        aiDrafts: state.aiDrafts.map((draft) =>
+          draft.id === action.draftId ? { ...draft, approvalState: 'discarded' as const } : draft,
+        ),
+        conversations: state.conversations.map((conversation) =>
+          conversation.aiDraftId === action.draftId
+            ? { ...conversation, aiDraft: null, aiDraftId: undefined }
+            : conversation,
+        ),
+        events: pushEvent(state, 'inbox.ai_draft_discarded', 'Inbox', `AI draft ${action.draftId} discarded`),
+        toast: 'AI draft discarded.',
+      }
+    case 'RECORD_CONNECTOR_TEST': {
+      const at = now()
+      const run: ConnectorTestRun = {
+        id: nid('ctr'),
+        channel: action.channel,
+        testType: action.testType,
+        status: action.status,
+        message: action.message,
+        at,
+      }
+      const channelAccounts = state.channelAccounts.map((account) => {
+        if (account.channel !== action.channel) return account
+        const outboundPatch = action.testType === 'outbound'
+          ? { sendEnabled: action.status === 'success', lastOutboundAt: action.status === 'success' ? at : account.lastOutboundAt }
+          : {}
+        const inboundPatch = action.testType === 'inbound' || action.testType === 'webhook'
+          ? { receiveEnabled: action.status === 'success', webhookStatus: action.status === 'success' ? 'healthy' as const : 'failing' as const, lastInboundAt: action.status === 'success' ? at : account.lastInboundAt }
+          : {}
+        const next = { ...account, ...outboundPatch, ...inboundPatch, lastTestAt: at, lastError: action.status === 'success' ? undefined : action.message }
+        const setupStatus = next.sendEnabled && next.receiveEnabled
+          ? 'connected'
+          : next.sendEnabled || next.receiveEnabled
+            ? 'degraded'
+            : action.status === 'failed'
+              ? 'error'
+              : next.setupStatus
+        return { ...next, setupStatus }
+      })
+      return {
+        ...state,
+        channelAccounts,
+        connectorTestRuns: [run, ...state.connectorTestRuns],
+        events: pushEvent(state, `connector.${action.testType}.${action.status}`, 'Inbox', `${action.channel} ${action.testType} test: ${action.message}`),
+        toast: `${action.channel} ${action.testType} test recorded.`,
       }
     }
     case 'PAY_BILL': {

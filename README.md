@@ -14,7 +14,7 @@
 
 | Directory | What it is |
 |---|---|
-| [`lightsoff/`](lightsoff/) | Interactive UI prototype (Vite + React, in-memory state) |
+| [`lightsoff/`](lightsoff/) | Interactive UI prototype (Vite + React, in-memory state), now with native Module 1 omnichannel setup + inbox policy wiring |
 | [`base44-prototype/`](base44-prototype/) | Migrated Base44 / OMB PIT prototype with Module 1 AI omnichannel setup |
 | [`supabase/`](supabase/) | Phase 0 database foundation: multi-tenant schema, RLS policies, event bus, credential vault + SQL test suite |
 | [`api/`](api/) | Phase 0 API service (Fastify + Postgres, RLS enforced end-to-end) — see its README for local dev and deployment |
@@ -54,3 +54,13 @@ http://127.0.0.1:5173/module1-local-smoke?smoke_base_url=https://your-published-
 ```
 
 Provider API keys still belong in Base44 Dashboard Secrets, not in `.env` files. Use `base44-prototype/docs/MODULE_1_SECRETS_CHECKLIST.md` and `base44-prototype/docs/MODULE_1_CONNECTOR_SETUP_RUNBOOK.md` for the live setup session.
+
+## Native Module 1 in Cursor app
+
+The Cursor prototype in [`lightsoff/`](lightsoff/) also has Module 1 integrated into its own app shell:
+
+- `Omnichannel Setup` is a System nav item with Email, Facebook Messenger, Instagram, and WhatsApp connector readiness cards.
+- The Unified Inbox now reads native channel account, connector test, AI draft, and send-policy state.
+- AI remains draft-only. Manual send is blocked unless the channel has live send + receive proof and the channel policy allows the reply.
+
+The Cursor app tracks readiness and operator workflow. The actual live connector implementation from the earlier build remains in `base44-prototype/` until this repo gets a backend function runtime for those provider calls.

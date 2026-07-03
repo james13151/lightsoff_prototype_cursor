@@ -14,6 +14,7 @@ import { SettingsView } from './components/SettingsView'
 import { TeamView } from './components/TeamView'
 import { ThemeToggle } from './components/ThemeToggle'
 import { Reports } from './components/Reports'
+import { OmnichannelSetup } from './components/OmnichannelSetup'
 import { ROLE_LABELS } from './lib/permissions'
 
 export type View =
@@ -26,6 +27,7 @@ export type View =
   | 'rnd'
   | 'collab'
   | 'events'
+  | 'omnichannel'
   | 'team'
   | 'settings'
 
@@ -43,6 +45,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string; group: string }[] = 
   { view: 'marketing', label: 'Marketing', icon: '📣', group: 'Modules' },
   { view: 'rnd', label: 'R&D Kanban', icon: '🧪', group: 'Modules' },
   { view: 'collab', label: 'Internal Collab', icon: '🎫', group: 'Modules' },
+  { view: 'omnichannel', label: 'Omnichannel Setup', icon: '🔌', group: 'System' },
   { view: 'events', label: 'Event Bus', icon: '⚡', group: 'System' },
   { view: 'team', label: 'Team & permissions', icon: '👥', group: 'System' },
   { view: 'settings', label: 'AI Settings', icon: '⚙️', group: 'System' },
@@ -70,10 +73,12 @@ export default function App({
 
   const openTicketCount = state.tickets.filter((t) => t.status !== 'resolved').length
   const openConvCount = state.conversations.filter((c) => c.status === 'open').length
+  const incompleteChannelCount = state.channelAccounts.filter((account) => !(account.sendEnabled && account.receiveEnabled)).length
 
   const badgeFor = (view: View): number => {
     if (view === 'inbox') return openConvCount
     if (view === 'collab') return openTicketCount
+    if (view === 'omnichannel') return incompleteChannelCount
     return 0
   }
 
@@ -87,6 +92,7 @@ export default function App({
     case 'marketing': content = <Marketing />; break
     case 'rnd': content = <Kanban focusId={nav.focusId} />; break
     case 'collab': content = <Collab focusId={nav.focusId} />; break
+    case 'omnichannel': content = <OmnichannelSetup />; break
     case 'events': content = <EventBus />; break
     case 'team': content = <TeamView />; break
     case 'settings': content = <SettingsView />; break

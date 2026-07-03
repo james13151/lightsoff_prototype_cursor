@@ -71,11 +71,14 @@ The three UX surfaces from the spec:
 
 3. **Drill-down views** — traditional module screens (stock table, PO/receipt lists, journal, unified inbox, campaign list, kanban board, ticket list) for verification and edge cases.
 
+4. **Omnichannel Setup** — Module 1 connector cockpit for Email/Postmark, Facebook Messenger, Instagram Messaging, and WhatsApp Cloud API readiness. It tracks required secrets, webhook URLs, latest inbound/outbound proof, webhook health, and blocks manual sends until the channel has live proof.
+
 Cross-module wiring demonstrated live:
 
 - Paying a bill auto-posts a double-entry journal entry (Finance ← Inventory AP event)
 - A captured sample receipt auto-creates an R&D kanban card (R&D ← Inventory event)
 - The OOS ad guard holds a campaign while its SKU is out of stock, and surfaces a resume approval in the digest once restocked (Marketing ← Inventory events)
+- AI inbox drafts are approval-only and tied to channel setup policy; disconnected or receive-only channels show the block reason instead of pretending to send
 - Low-confidence expense claims route to an Internal Collab approval ticket; approving the ticket posts the journal entry and resolves the ticket (Collab ↔ Finance)
 - Every action publishes to the **Event Bus** view — the append-only feed the digest is built on
 
@@ -84,8 +87,9 @@ Confidence-aware automation (spec §1.5) is adjustable in **AI Settings**: the a
 ## What's simulated
 
 - The AI classifier (`src/ai/classify.ts`) is deterministic rules standing in for an LLM call
-- **Phase 2/3 modules** (Inbox, Marketing, R&D, Collab) use in-memory seed data even in live mode
-- Shopify / Meta / WhatsApp integrations are not connected yet
+- **Phase 2/3 modules** (Marketing, R&D, Collab) use in-memory seed data even in live mode
+- Inbox and Omnichannel Setup model live channel readiness, but provider calls still require the migrated Base44 backend functions in `../base44-prototype/`
+- Shopify integrations are not connected yet
 - In demo mode (no `VITE_API_URL`), all state is in-memory and resets on refresh
 
 ## Stack

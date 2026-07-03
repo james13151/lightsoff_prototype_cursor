@@ -1,6 +1,7 @@
 import type {
   Vendor, Warehouse, StockByWarehouse, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
+  ChannelAccount, ConnectorTestRun, AiDraftRecord,
 } from '../types'
 import type { TeamMember } from '../api/members'
 
@@ -169,10 +170,130 @@ export const campaigns: Campaign[] = [
   { id: 'c3', name: 'Brand Search', platform: 'Google', status: 'active', dailyBudget: 15, spend30d: 430, revenue30d: 760, linkedSku: null },
 ]
 
+export const channelAccounts: ChannelAccount[] = [
+  {
+    id: 'ch-email',
+    channel: 'email',
+    displayName: 'Email',
+    setupStatus: 'degraded',
+    webhookStatus: 'healthy',
+    sendEnabled: false,
+    receiveEnabled: true,
+    requiredSecrets: ['POSTMARK_SERVER_TOKEN', 'POSTMARK_FROM_EMAIL', 'POSTMARK_INBOUND_WEBHOOK_SECRET'],
+    setupChecklist: [
+      'Create a Postmark server.',
+      'Set inbound forwarding to the webhook URL.',
+      'Store the inbound secret in the provider dashboard and append it to the callback.',
+      'Send a live outbound test before marking Email send-ready.',
+    ],
+    webhookFunction: 'receivePostmarkInbound',
+    lastInboundAt: daysAgo(0),
+    lastError: 'Waiting for outbound Postmark proof before enabling sends.',
+  },
+  {
+    id: 'ch-facebook',
+    channel: 'facebook',
+    displayName: 'Facebook Messenger',
+    setupStatus: 'degraded',
+    webhookStatus: 'unknown',
+    sendEnabled: true,
+    receiveEnabled: false,
+    requiredSecrets: ['META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID', 'META_VERIFY_TOKEN', 'META_APP_SECRET'],
+    setupChecklist: [
+      'Use a Page token with Messenger permissions.',
+      'Subscribe the app webhook to Page messages.',
+      'Complete Meta App Review before production use.',
+    ],
+    webhookFunction: 'receiveMetaWebhook',
+    webhookQuery: 'channel=facebook',
+    lastOutboundAt: daysAgo(0),
+    lastError: 'Credentials are send-ready; waiting for first real inbound webhook.',
+  },
+  {
+    id: 'ch-instagram',
+    channel: 'instagram',
+    displayName: 'Instagram',
+    setupStatus: 'needs_secrets',
+    webhookStatus: 'unknown',
+    sendEnabled: false,
+    receiveEnabled: false,
+    requiredSecrets: ['META_PAGE_ACCESS_TOKEN', 'META_INSTAGRAM_ACCOUNT_ID', 'META_VERIFY_TOKEN', 'META_APP_SECRET'],
+    setupChecklist: [
+      'Connect a professional Instagram account to Meta.',
+      'Store the Instagram account id and Page token.',
+      'Subscribe messaging webhooks in Meta.',
+    ],
+    webhookFunction: 'receiveMetaWebhook',
+    webhookQuery: 'channel=instagram',
+    lastError: 'Missing META_INSTAGRAM_ACCOUNT_ID.',
+  },
+  {
+    id: 'ch-whatsapp',
+    channel: 'whatsapp',
+    displayName: 'WhatsApp',
+    setupStatus: 'connected',
+    webhookStatus: 'healthy',
+    sendEnabled: true,
+    receiveEnabled: true,
+    requiredSecrets: ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_VERIFY_TOKEN', 'META_APP_SECRET'],
+    setupChecklist: [
+      'Configure the WhatsApp Cloud API phone number.',
+      'Use the webhook URL as the callback URL.',
+      'Free-form replies require an open 24-hour service window unless using a template.',
+    ],
+    webhookFunction: 'receiveWhatsAppWebhook',
+    lastInboundAt: daysAgo(1),
+    lastOutboundAt: daysAgo(1),
+  },
+]
+
+export const connectorTestRuns: ConnectorTestRun[] = [
+  { id: 'ctr-1', channel: 'whatsapp', testType: 'outbound', status: 'success', message: 'WhatsApp Cloud API accepted the send request.', at: daysAgo(1) },
+  { id: 'ctr-2', channel: 'email', testType: 'inbound', status: 'success', message: 'Postmark inbound webhook created a normalized conversation.', at: daysAgo(0) },
+  { id: 'ctr-3', channel: 'facebook', testType: 'outbound', status: 'success', message: 'Meta Page token reached the messages endpoint.', at: daysAgo(0) },
+  { id: 'ctr-4', channel: 'instagram', testType: 'secrets', status: 'failed', message: 'Missing META_INSTAGRAM_ACCOUNT_ID.', at: daysAgo(0) },
+]
+
+export const aiDrafts: AiDraftRecord[] = [
+  {
+    id: 'draft-cv1',
+    conversationId: 'cv1',
+    channel: 'instagram',
+    intent: 'stock_question',
+    risk: 'medium',
+    summary: 'Customer wants Red Tee small restock timing; answer should use live stock and reorder ETA.',
+    body: 'Hi Maya! Thanks so much for your patience 💛 The Red Tee (S) is currently out of stock, but we have a restock arriving in about 12 days — I can email you the moment it lands. In the meantime, the Red Tee in M is available if that could work!',
+    confidence: 0.91,
+    approvalState: 'draft',
+    createdAt: daysAgo(0),
+  },
+  {
+    id: 'draft-cv2',
+    conversationId: 'cv2',
+    channel: 'email',
+    intent: 'delivery_dispute',
+    risk: 'high',
+    summary: 'Customer threatens chargeback on a delivered-but-not-received order; human approval is mandatory.',
+    body: 'Hi Daniel, I\'m really sorry — this isn\'t the experience we want you to have. I can see order #5488 was marked delivered on the 24th, but since it never reached you, I\'d like to make it right immediately: I can ship a replacement today with express shipping, or issue a full refund — whichever you prefer. Just reply with your choice and I\'ll action it within the hour.',
+    confidence: 0.62,
+    approvalState: 'draft',
+    createdAt: daysAgo(0),
+  },
+]
+
 export const conversations: Conversation[] = [
   {
     id: 'cv1', channel: 'instagram', customerName: 'Maya R.', subject: 'Is the red one back in stock?',
     sentiment: 'neutral', urgent: false, status: 'open',
+    channelAccountId: 'ch-instagram',
+    externalThreadId: 'ig-thread-1001',
+    externalCustomerId: '17841400000000001',
+    lastExternalMessageAt: daysAgo(0),
+    aiDraftId: 'draft-cv1',
+    aiIntent: 'stock_question',
+    aiRisk: 'medium',
+    aiSummary: 'Customer wants Red Tee small restock timing; answer should use live stock and reorder ETA.',
+    sendPolicyState: 'needs_secrets',
     messages: [
       { id: 'm1', from: 'customer', body: 'Hi! Is the red tee in small coming back in stock soon? Been waiting 😅', at: daysAgo(0) },
     ],
@@ -183,6 +304,15 @@ export const conversations: Conversation[] = [
   {
     id: 'cv2', channel: 'email', customerName: 'Daniel K.', subject: 'Order #5488 never arrived',
     sentiment: 'negative', urgent: true, status: 'open',
+    channelAccountId: 'ch-email',
+    externalThreadId: 'email-thread-order-5488',
+    externalCustomerId: 'daniel@example.com',
+    lastExternalMessageAt: daysAgo(0),
+    aiDraftId: 'draft-cv2',
+    aiIntent: 'delivery_dispute',
+    aiRisk: 'high',
+    aiSummary: 'Delivered-but-not-received complaint with chargeback threat; high risk and human approval required.',
+    sendPolicyState: 'receive_only',
     messages: [
       { id: 'm2', from: 'customer', body: 'This is the second time I am writing. My order #5488 was marked delivered a week ago but I never received it. I want a refund or a replacement TODAY or I am disputing the charge.', at: daysAgo(0) },
     ],
@@ -193,6 +323,12 @@ export const conversations: Conversation[] = [
   {
     id: 'cv3', channel: 'whatsapp', customerName: 'Priya S.', subject: 'Where is my order?',
     sentiment: 'neutral', urgent: false, status: 'answered',
+    channelAccountId: 'ch-whatsapp',
+    externalThreadId: 'wa-thread-5502',
+    externalCustomerId: '+14155550188',
+    lastExternalMessageAt: daysAgo(1),
+    serviceWindowUntil: daysFromNow(0),
+    sendPolicyState: 'ready',
     messages: [
       { id: 'm3', from: 'customer', body: 'hey, any update on my order #5502?', at: daysAgo(1) },
       { id: 'm4', from: 'brand', body: 'Hi Priya! Order #5502 shipped yesterday via DHL — tracking says it\'s out for delivery tomorrow. Tracking link: dhl.com/track/882…', at: daysAgo(1) },
