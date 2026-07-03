@@ -16,6 +16,8 @@ export interface AccountOption {
   code: string
   name: string
   type: string
+  isSystem?: boolean
+  netDebit?: number
 }
 
 export async function fetchAccounts(token: string, tenantId: string): Promise<AccountOption[]> {
@@ -25,7 +27,25 @@ export async function fetchAccounts(token: string, tenantId: string): Promise<Ac
     code: a.code,
     name: a.name,
     type: a.type,
+    isSystem: a.is_system ?? false,
+    netDebit: Number(a.net_debit ?? 0),
   }))
+}
+
+export async function createAccount(
+  token: string,
+  tenantId: string,
+  data: { code: string; name: string; type: string },
+) {
+  return post(token, '/v1/accounts', { tenant_id: tenantId, code: data.code, name: data.name, type: data.type })
+}
+
+export async function updateAccount(
+  token: string,
+  accountId: string,
+  data: { name?: string; type?: string },
+) {
+  return patch(token, `/v1/accounts/${accountId}`, { name: data.name, type: data.type })
 }
 
 export async function createVendor(

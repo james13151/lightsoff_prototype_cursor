@@ -24,13 +24,74 @@ export function financeRoutes(app: FastifyInstance) {
     if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
     return withUser(req.userId, async (db) => {
       const r = await db.query(
-        `select b.account_id as id, b.code, b.name, b.type, b.net_debit
-           from app.account_balances b where b.tenant_id = $1 order by b.code`,
+        `select a.id, a.code, a.name, a.type, a.is_system,
+                coalesce(b.net_debit, 0) as net_debit
+           from app.accounts a
+           left join app.account_balances b on b.account_id = a.id and b.tenant_id = a.tenant_id
+          where a.tenant_id = $1
+          order by a.code`,
         [tenant_id],
       )
       return r.rows
     })
   })
+
+  app.post<{ Body: { tenant_id: string; code: string; name: string; type: string } }>(
+    '/v1/accounts',
+    async (req, reply) => {
+      const { tenant_id, code, name, type } = req.body ?? {}
+      if (!tenant_id || !code?.trim() || !name?.trim() || !type) {
+        return reply.code(400).send({ error: 'tenant_id, code, name, type are required' })
+      }
+      if (!/^[0-9]{4}$/.test(code.trim())) {
+        return reply.code(400).send({ error: 'code must be a 4-digit number' })
+      }
+      try {
+        const row = await withUser(req.userId, async (db) => {
+          const r = await db.query(
+            `insert into app.accounts (tenant_id, code, name, type, is_system)
+             values ($1, $2, $3, $4::app.account_type, false) returning *`,
+            [tenant_id, code.trim(), name.trim(), type],
+          )
+          return r.rows[0]
+        })
+        return reply.code(201).send(row)
+      } catch (err: unknown) {
+        if (isRlsViolation(err)) return reply.code(403).send({ error: 'admin role required' })
+        const message = (err as Error).message ?? ''
+        if (message.includes('accounts_tenant_id_code_key')) {
+          return reply.code(400).send({ error: 'account code already exists' })
+        }
+        throw err
+      }
+    },
+  )
+
+  app.patch<{ Params: { id: string }; Body: { name?: string; type?: string } }>(
+    '/v1/accounts/:id',
+    async (req, reply) => {
+      const { name, type } = req.body ?? {}
+      if (!name?.trim() && !type) return reply.code(400).send({ error: 'name or type required' })
+      try {
+        const row = await withUser(req.userId, async (db) => {
+          const r = await db.query(
+            `update app.accounts set
+               name = coalesce($2, name),
+               type = coalesce($3::app.account_type, type)
+             where id = $1 and not is_system
+             returning *`,
+            [req.params.id, name?.trim() ?? null, type ?? null],
+          )
+          return r.rows[0]
+        })
+        if (!row) return reply.code(404).send({ error: 'account not found or is system' })
+        return row
+      } catch (err: unknown) {
+        if (isRlsViolation(err)) return reply.code(403).send({ error: 'admin role required' })
+        throw err
+      }
+    },
+  )
 
   // Cash position + P&L computed straight from the journal (spec §4.2).
   app.get<{ Querystring: { tenant_id?: string } }>('/v1/finance/summary', async (req, reply) => {

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useStore } from '../store'
 import {
   adjustInventory, createProduct, createPurchaseOrder, createReceipt, createVendor, createWarehouse,
   updateProduct, updateVariant, updateVendor, updateWarehouse,
 } from '../api/mutations'
+import { useListFilter } from '../lib/useListFilter'
 import {
-  Badge, Button, Card, Field, FormPanel, Input, SectionTitle, Select, SubTabs, TextArea, timeAgo,
+  Badge, Button, Card, Field, FormPanel, Input, ListRow, ListToolbar,
+  Modal, SectionTitle, Select, SubTabs, TextArea, timeAgo,
 } from './ui'
 import { cartesianProduct, variantSku, variantTitle } from '../lib/matrix'
 import type { LocationAddress, POLineItem } from '../types'
@@ -26,12 +28,21 @@ const INV_TABS: { id: InvTab; label: string }[] = [
   { id: 'warehouses', label: 'Locations' },
 ]
 
-type EditTarget = { kind: 'vendor' | 'product' | 'warehouse'; id: string } | null
+type InvModal =
+  | { kind: 'vendor'; id?: string }
+  | { kind: 'product'; id?: string }
+  | { kind: 'warehouse'; id?: string }
+  | { kind: 'po' }
+  | { kind: 'receipt' }
+  | { kind: 'adjustment' }
+  | null
 
 export function Inventory() {
   const { state, spineMutate, auth } = useStore()
   const [tab, setTab] = useState<InvTab>('stock')
-  const [editTarget, setEditTarget] = useState<EditTarget>(null)
+  const [modal, setModal] = useState<InvModal>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [editVariants, setEditVariants] = useState<{ id: string; sku: string; price: string; unitCost: string; reorderPoint: string; title?: string }[]>([])
   const vendorName = (id: string) => state.vendors.find((v) => v.id === id)?.name ?? '—'
   const productById = (id: string | null) => state.products.find((p) => p.id === id)
@@ -56,9 +67,9 @@ export function Inventory() {
   const [productPrice, setProductPrice] = useState('')
   const [productCost, setProductCost] = useState('')
   const [productReorder, setProductReorder] = useState('0')
-  const [opt1Name, setOpt1Name] = useState('Size')
+  const [opt1Name] = useState('Size')
   const [opt1Values, setOpt1Values] = useState('')
-  const [opt2Name, setOpt2Name] = useState('Color')
+  const [opt2Name] = useState('Color')
   const [opt2Values, setOpt2Values] = useState('')
   const [poVendor, setPoVendor] = useState('')
   const [poNumber, setPoNumber] = useState('')
@@ -154,10 +165,24 @@ export function Inventory() {
     setWhCountry('')
   }
 
+  function closeModal() {
+    setModal(null)
+    resetVendorForm()
+    resetProductForm()
+    resetWarehouseForm()
+  }
+
+  function openCreate(kind: InvModal extends null ? never : NonNullable<InvModal>['kind']) {
+    if (kind === 'vendor') { resetVendorForm(); setModal({ kind: 'vendor' }) }
+    else if (kind === 'product') { resetProductForm(); setModal({ kind: 'product' }) }
+    else if (kind === 'warehouse') { resetWarehouseForm(); setModal({ kind: 'warehouse' }) }
+    else setModal({ kind } as InvModal)
+  }
+
   function startEditVendor(vendorId: string) {
     const v = state.vendors.find((x) => x.id === vendorId)
     if (!v) return
-    setEditTarget({ kind: 'vendor', id: vendorId })
+    setModal({ kind: 'vendor', id: vendorId })
     setVendorNameInput(v.name)
     setVendorLead(String(v.leadTimeDays))
     setVendorEmail(v.contactEmail ?? '')
@@ -165,7 +190,6 @@ export function Inventory() {
     setVendorPaymentTerms(v.paymentTerms ?? '')
     setVendorNotes(v.notes ?? '')
     setVendorRecurring(v.isRecurring)
-    setTab('master')
   }
 
   function startEditProduct(productId: string) {
@@ -173,7 +197,7 @@ export function Inventory() {
     const single = state.products.find((p) => p.id === productId)
     const master = pm ?? (single ? { id: single.id, title: single.name, description: undefined, brand: undefined, options: [], variants: [single] } : null)
     if (!master) return
-    setEditTarget({ kind: 'product', id: productId })
+    setModal({ kind: 'product', id: productId })
     setProductTitle(master.title)
     setProductBrand(master.brand ?? '')
     setProductDesc(master.description ?? '')
@@ -185,13 +209,12 @@ export function Inventory() {
       reorderPoint: String(v.reorderPoint),
       title: v.optionValues ? Object.values(v.optionValues).join(' / ') : undefined,
     })))
-    setTab('master')
   }
 
   function startEditWarehouse(warehouseId: string) {
     const w = state.warehouses.find((x) => x.id === warehouseId)
     if (!w) return
-    setEditTarget({ kind: 'warehouse', id: warehouseId })
+    setModal({ kind: 'warehouse', id: warehouseId })
     setWhCode(w.code)
     setWhName(w.name)
     setWhDefault(w.isDefault)
@@ -208,10 +231,7 @@ export function Inventory() {
   }
 
   function cancelEdit() {
-    setEditTarget(null)
-    resetVendorForm()
-    resetProductForm()
-    resetWarehouseForm()
+    closeModal()
   }
 
   const stockRows = stockWarehouseFilter
@@ -244,10 +264,10 @@ export function Inventory() {
       notes: vendorNotes.trim() || undefined,
       isRecurring: vendorRecurring,
     }
-    if (editTarget?.kind === 'vendor') {
+    if (modal?.kind === 'vendor' && modal.id) {
       await spineMutate(
-        () => updateVendor(auth!.token, editTarget.id, payload),
-        { type: 'UPDATE_VENDOR', vendorId: editTarget.id, ...payload },
+        () => updateVendor(auth!.token, modal.id!, payload),
+        { type: 'UPDATE_VENDOR', vendorId: modal.id!, ...payload },
       )
       cancelEdit()
       return
@@ -257,6 +277,7 @@ export function Inventory() {
       { type: 'ADD_VENDOR', ...payload },
     )
     resetVendorForm()
+    closeModal()
   }
 
   async function onAddWarehouse(e: FormEvent) {
@@ -278,10 +299,10 @@ export function Inventory() {
       contactPhone: whContactPhone.trim() || undefined,
       address: Object.values(address).some(Boolean) ? address : undefined,
     }
-    if (editTarget?.kind === 'warehouse') {
+    if (modal?.kind === 'warehouse' && modal.id) {
       await spineMutate(
-        () => updateWarehouse(auth!.token, editTarget.id, payload),
-        { type: 'UPDATE_WAREHOUSE', warehouseId: editTarget.id, ...payload },
+        () => updateWarehouse(auth!.token, modal.id!, payload),
+        { type: 'UPDATE_WAREHOUSE', warehouseId: modal.id!, ...payload },
       )
       cancelEdit()
       return
@@ -292,13 +313,14 @@ export function Inventory() {
       { type: 'CREATE_WAREHOUSE', code: whCode.trim(), ...payload },
     )
     resetWarehouseForm()
+    closeModal()
   }
 
   async function onAddProduct(e: FormEvent) {
     e.preventDefault()
     if (!productTitle.trim()) return
 
-    if (editTarget?.kind === 'product') {
+    if (modal?.kind === 'product' && modal.id) {
       const variants = editVariants.map((v) => ({
         id: v.id,
         sku: v.sku.trim(),
@@ -309,7 +331,7 @@ export function Inventory() {
       }))
       if (variants.some((v) => !v.sku)) return
       const demoPayload = {
-        productId: editTarget.id,
+        productId: modal.id,
         title: productTitle.trim(),
         description: productDesc.trim() || undefined,
         brand: productBrand.trim() || undefined,
@@ -317,7 +339,7 @@ export function Inventory() {
       }
       await spineMutate(
         async () => {
-          await updateProduct(auth!.token, editTarget.id, {
+          await updateProduct(auth!.token, modal.id!, {
             title: demoPayload.title,
             description: demoPayload.description,
             brand: demoPayload.brand,
@@ -361,6 +383,7 @@ export function Inventory() {
       { type: 'ADD_PRODUCT', title: productTitle.trim(), sku: variants[0].sku, price: variants[0].price, unitCost: variants[0].unitCost, reorderPoint },
     )
     resetProductForm()
+    closeModal()
   }
 
   async function onCreatePo(e: FormEvent) {
@@ -384,6 +407,7 @@ export function Inventory() {
       }),
       { type: 'CREATE_PO', vendorId, variantId: first.productId, qty: first.qty, unitCost: first.unitCost, send: poSend },
     )
+    closeModal()
   }
 
   async function onReceive(e: FormEvent) {
@@ -418,6 +442,7 @@ export function Inventory() {
         description: isSample ? 'Sample item' : undefined,
       },
     )
+    closeModal()
     setTab('stock')
     setStockWarehouseFilter('')
   }
@@ -434,7 +459,52 @@ export function Inventory() {
     )
     setAdjQty('')
     setAdjMemo('')
+    closeModal()
   }
+
+  function modalIsEdit(m: InvModal): boolean {
+    return m !== null && 'id' in m && Boolean(m.id)
+  }
+
+  const productMasters = state.productMasters.length > 0
+    ? state.productMasters
+    : state.products.map((p) => ({ id: p.id, title: p.name, description: undefined, variants: [p], options: [] }))
+
+  const matchVendor = useCallback((v: typeof state.vendors[0], q: string) =>
+    [v.name, v.contactEmail, v.phone, v.paymentTerms].some((s) => String(s ?? '').toLowerCase().includes(q)), [])
+  const filteredVendors = useListFilter(state.vendors, search, matchVendor)
+  const filteredProducts = useListFilter(productMasters, search, useCallback((p, q) =>
+    [p.title, p.description, ...p.variants.map((v) => v.sku)].some((s) => String(s ?? '').toLowerCase().includes(q)), []))
+  const filteredPos = useListFilter(state.purchaseOrders, search, useCallback((po, q) =>
+    [po.poNumber, po.status, vendorName(po.vendorId)].some((s) => String(s ?? '').toLowerCase().includes(q)), [state.vendors]))
+    .filter((po) => statusFilter === 'all' ? true : po.status === statusFilter)
+  const filteredReceipts = useListFilter(state.receipts, search, useCallback((r, q) =>
+    [r.id, r.type, vendorName(r.vendorId)].some((s) => String(s ?? '').toLowerCase().includes(q)), [state.vendors]))
+  const filteredLedger = useListFilter(state.ledger, search, useCallback((e, q) => {
+    const p = productById(e.productId)
+    return [p?.sku, p?.name, e.reason, e.warehouseCode].some((s) => String(s ?? '').toLowerCase().includes(q))
+  }, [state.products]))
+  const filteredWarehouses = useListFilter(state.warehouses, search, useCallback((w, q) =>
+    [w.code, w.name, w.contactEmail].some((s) => String(s ?? '').toLowerCase().includes(q)), []))
+
+  const filteredStockRows = useListFilter(stockRows, search, useCallback((s, q) => {
+    const p = productById(s.variantId)
+    return [s.sku, p?.name, s.warehouseCode].some((x) => String(x ?? '').toLowerCase().includes(q))
+  }, [state.products]))
+
+  const tabAction = (() => {
+    if (tab === 'master') return (
+      <div className="flex gap-1">
+        <Button variant="secondary" onClick={() => openCreate('vendor')}>+ Vendor</Button>
+        <Button variant="secondary" onClick={() => openCreate('product')}>+ Product</Button>
+      </div>
+    )
+    if (tab === 'purchase_orders') return <Button variant="secondary" onClick={() => openCreate('po')}>+</Button>
+    if (tab === 'receipts') return <Button variant="secondary" onClick={() => openCreate('receipt')}>+</Button>
+    if (tab === 'adjustments') return <Button variant="secondary" onClick={() => openCreate('adjustment')}>+</Button>
+    if (tab === 'warehouses') return <Button variant="secondary" onClick={() => openCreate('warehouse')}>+</Button>
+    return undefined
+  })()
 
   function WarehouseSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
     return (
@@ -447,25 +517,29 @@ export function Inventory() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SectionTitle sub="Inventory transactions and stock by location — LightsOff is the system of record; movements push to Shopify.">
         Inventory
       </SectionTitle>
 
-      <SubTabs tabs={INV_TABS} active={tab} onChange={setTab} />
+      <SubTabs tabs={INV_TABS} active={tab} onChange={(t) => { setTab(t); setSearch(''); setStatusFilter('all') }} action={tabAction} />
 
       {tab === 'stock' && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <Field label="Filter by location">
-              <Select value={stockWarehouseFilter} onChange={(e) => setStockWarehouseFilter(e.target.value)}>
-                <option value="">All locations (aggregate)</option>
+        <div className="space-y-2">
+          <ListToolbar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="Search SKU, product…"
+            count={stockWarehouseFilter ? filteredStockRows.length : state.products.length}
+            filters={
+              <Select value={stockWarehouseFilter} onChange={(e) => setStockWarehouseFilter(e.target.value)} className="max-w-[200px]">
+                <option value="">All locations</option>
                 {state.warehouses.map((w) => (
                   <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
                 ))}
               </Select>
-            </Field>
-          </div>
+            }
+          />
           <Card>
             <table className="w-full text-sm">
               <thead>
@@ -480,9 +554,9 @@ export function Inventory() {
               </thead>
               <tbody>
                 {stockWarehouseFilter ? (
-                  stockRows.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No stock at this location.</td></tr>
-                  ) : stockRows.map((s) => {
+                  filteredStockRows.length === 0 ? (
+                    <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-400">No stock at this location.</td></tr>
+                  ) : filteredStockRows.map((s) => {
                     const p = productById(s.variantId)
                     return (
                       <tr key={`${s.warehouseId}-${s.variantId}`} className="border-b border-slate-50 last:border-0">
@@ -530,302 +604,75 @@ export function Inventory() {
       )}
 
       {tab === 'master' && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {editTarget?.kind === 'product' ? (
-            <form onSubmit={onAddProduct} className="lg:col-span-2">
-              <FormPanel title="Edit product">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs text-slate-500">Editing master record</span>
-                  <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Product title">
-                    <Input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} required />
-                  </Field>
-                  <Field label="Brand">
-                    <Input value={productBrand} onChange={(e) => setProductBrand(e.target.value)} />
-                  </Field>
-                </div>
-                <Field label="Description">
-                  <TextArea value={productDesc} onChange={(e) => setProductDesc(e.target.value)} />
-                </Field>
-                <div className="rounded-lg border border-slate-100">
-                  <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">Variants</div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
-                        <th className="px-3 py-2 font-medium">Variant</th>
-                        <th className="px-3 py-2 font-medium">SKU</th>
-                        <th className="px-3 py-2 font-medium text-right">Price</th>
-                        <th className="px-3 py-2 font-medium text-right">Unit cost</th>
-                        <th className="px-3 py-2 font-medium text-right">Reorder pt</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {editVariants.map((row, i) => (
-                        <tr key={row.id} className="border-b border-slate-50 last:border-0">
-                          <td className="px-3 py-2 text-slate-600">{row.title ?? '—'}</td>
-                          <td className="px-3 py-2">
-                            <Input value={row.sku} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, sku: e.target.value } : r))} className="font-mono text-xs" />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input type="number" step="0.01" value={row.price} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, price: e.target.value } : r))} className="text-right" />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input type="number" step="0.01" value={row.unitCost} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, unitCost: e.target.value } : r))} className="text-right" />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input type="number" value={row.reorderPoint} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, reorderPoint: e.target.value } : r))} className="text-right" />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <Button type="submit" className="w-full">Save product</Button>
-              </FormPanel>
-            </form>
-          ) : (
-            <>
-          <form onSubmit={onAddVendor}>
-            <FormPanel title={editTarget?.kind === 'vendor' ? 'Edit vendor' : 'Add vendor'}>
-              {editTarget?.kind === 'vendor' && (
-                <div className="mb-2 flex justify-end">
-                  <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
-                </div>
-              )}
-              <Field label="Name">
-                <Input value={vendorNameInput} onChange={(e) => setVendorNameInput(e.target.value)} placeholder="Acme Textiles" required />
-              </Field>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Email">
-                  <Input type="email" value={vendorEmail} onChange={(e) => setVendorEmail(e.target.value)} placeholder="orders@vendor.com" />
-                </Field>
-                <Field label="Phone">
-                  <Input value={vendorPhone} onChange={(e) => setVendorPhone(e.target.value)} placeholder="+1 415-555-0100" />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Lead time (days)">
-                  <Input type="number" value={vendorLead} onChange={(e) => setVendorLead(e.target.value)} min={1} />
-                </Field>
-                <Field label="Payment terms">
-                  <Input value={vendorPaymentTerms} onChange={(e) => setVendorPaymentTerms(e.target.value)} placeholder="Net 30" />
-                </Field>
-              </div>
-              <Field label="Notes">
-                <TextArea value={vendorNotes} onChange={(e) => setVendorNotes(e.target.value)} placeholder="Preferred carrier, account #, etc." />
-              </Field>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" checked={vendorRecurring} onChange={(e) => setVendorRecurring(e.target.checked)} />
-                Recurring vendor (auto-post bills)
-              </label>
-              <Button type="submit" className="w-full">{editTarget?.kind === 'vendor' ? 'Save vendor' : 'Create vendor'}</Button>
-            </FormPanel>
-          </form>
-
-          {!editTarget && (
-          <form onSubmit={onAddProduct} className="lg:col-span-2">
-            <FormPanel title="Add product (master + variant matrix)">
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Product title">
-                  <Input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} placeholder="Blue Hoodie" required />
-                </Field>
-                <Field label="Brand">
-                  <Input value={productBrand} onChange={(e) => setProductBrand(e.target.value)} placeholder="Acme" />
-                </Field>
-              </div>
-              <Field label="Description">
-                <TextArea value={productDesc} onChange={(e) => setProductDesc(e.target.value)} placeholder="Midweight fleece hoodie with kangaroo pocket" />
-              </Field>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Base SKU">
-                  <Input value={productSku} onChange={(e) => setProductSku(e.target.value)} placeholder="HOOD-BLU" required />
-                </Field>
-                <Field label="Reorder pt (all variants)">
-                  <Input type="number" value={productReorder} onChange={(e) => setProductReorder(e.target.value)} min={0} />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Default price">
-                  <Input type="number" step="0.01" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="68.00" />
-                </Field>
-                <Field label="Default unit cost">
-                  <Input type="number" step="0.01" value={productCost} onChange={(e) => setProductCost(e.target.value)} placeholder="18.50" />
-                </Field>
-              </div>
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                <div className="mb-2 text-xs font-medium text-slate-500">Variant options (comma-separated values)</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Option 1 name">
-                    <Input value={opt1Name} onChange={(e) => setOpt1Name(e.target.value)} placeholder="Size" />
-                  </Field>
-                  <Field label="Values">
-                    <Input value={opt1Values} onChange={(e) => setOpt1Values(e.target.value)} placeholder="S, M, L" />
-                  </Field>
-                  <Field label="Option 2 name">
-                    <Input value={opt2Name} onChange={(e) => setOpt2Name(e.target.value)} placeholder="Color" />
-                  </Field>
-                  <Field label="Values">
-                    <Input value={opt2Values} onChange={(e) => setOpt2Values(e.target.value)} placeholder="Blue, Black" />
-                  </Field>
-                </div>
-              </div>
-              {variantRows.length > 0 && (
-                <div className="rounded-lg border border-slate-100">
-                  <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
-                    Variants — unique SKU and price per row ({variantRows.length})
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
-                        <th className="px-3 py-2 font-medium">Variant</th>
-                        <th className="px-3 py-2 font-medium">SKU</th>
-                        <th className="px-3 py-2 font-medium text-right">Price</th>
-                        <th className="px-3 py-2 font-medium text-right">Unit cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {variantRows.map((row) => (
-                        <tr key={row.key} className="border-b border-slate-50 last:border-0">
-                          <td className="px-3 py-2 text-slate-600">{row.title}</td>
-                          <td className="px-3 py-2">
-                            <Input
-                              value={row.sku}
-                              onChange={(e) => setVariantEdits((prev) => ({ ...prev, [row.key]: { sku: e.target.value, price: row.price, unitCost: row.unitCost } }))}
-                              className="font-mono text-xs"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={row.price}
-                              onChange={(e) => setVariantEdits((prev) => ({ ...prev, [row.key]: { sku: row.sku, price: e.target.value, unitCost: row.unitCost } }))}
-                              className="text-right"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={row.unitCost}
-                              onChange={(e) => setVariantEdits((prev) => ({ ...prev, [row.key]: { sku: row.sku, price: row.price, unitCost: e.target.value } }))}
-                              className="text-right"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <Button type="submit" className="w-full">Create product</Button>
-            </FormPanel>
-          </form>
-          )}
-            </>
-          )}
-
-          {!editTarget && (
-          <Card className="lg:col-span-2 p-4">
-            <div className="mb-3 text-sm font-medium text-slate-700">Vendors ({state.vendors.length})</div>
-            <div className="space-y-2">
-              {state.vendors.map((v) => (
-                <div key={v.id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
+        <div className="space-y-3">
+          <ListToolbar search={search} onSearchChange={setSearch} placeholder="Search vendors & products…" />
+          <Card className="p-3">
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Vendors ({filteredVendors.length})</div>
+            <div className="space-y-1">
+              {filteredVendors.length === 0 ? (
+                <p className="text-sm text-slate-400">No vendors — click + Vendor to add one.</p>
+              ) : filteredVendors.map((v) => (
+                <ListRow key={v.id}>
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-medium">{v.name}</span>
-                    <Badge tone="slate">{v.leadTimeDays}d lead</Badge>
+                    <Badge tone="slate">{v.leadTimeDays}d</Badge>
                     {v.paymentTerms && <Badge tone="sky">{v.paymentTerms}</Badge>}
-                    {!v.isRecurring && <Badge tone="amber">new vendor</Badge>}
                     <Button type="button" variant="ghost" className="ml-auto" onClick={() => startEditVendor(v.id)}>Edit</Button>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {[v.contactEmail, v.phone].filter(Boolean).join(' · ')}
-                    {v.notes && <span className="block mt-0.5">{v.notes}</span>}
-                  </div>
-                </div>
+                  <div className="text-[11px] text-slate-500">{[v.contactEmail, v.phone].filter(Boolean).join(' · ')}</div>
+                </ListRow>
               ))}
             </div>
           </Card>
-          )}
-
-          {!editTarget && (state.productMasters.length > 0 || state.products.length > 0) && (
-            <Card className="lg:col-span-2 p-4">
-              <div className="mb-3 text-sm font-medium text-slate-700">Products</div>
-              <div className="space-y-3">
-                {(state.productMasters.length > 0 ? state.productMasters : state.products.map((p) => ({ id: p.id, title: p.name, description: undefined, variants: [p], options: [] }))).map((pm) => (
-                  <div key={pm.id} className="rounded-lg border border-slate-100 px-3 py-2">
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1">
-                        <div className="font-medium">{pm.title}</div>
-                        {pm.description && <p className="mt-0.5 text-xs text-slate-500">{pm.description}</p>}
-                        <div className="mt-2 space-y-1">
-                          {pm.variants.map((v) => (
-                            <div key={v.id} className="flex justify-between text-xs text-slate-600">
-                              <span className="font-mono">{v.sku}</span>
-                              <span>${v.price.toFixed(2)} · cost ${v.unitCost.toFixed(2)}</span>
-                            </div>
-                          ))}
-                        </div>
+          <Card className="p-3">
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Products ({filteredProducts.length})</div>
+            <div className="space-y-1">
+              {filteredProducts.length === 0 ? (
+                <p className="text-sm text-slate-400">No products yet.</p>
+              ) : filteredProducts.map((pm) => (
+                <ListRow key={pm.id}>
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium">{pm.title}</div>
+                      <div className="mt-1 space-y-0.5">
+                        {pm.variants.map((v) => (
+                          <div key={v.id} className="flex justify-between text-[11px] text-slate-600">
+                            <span className="font-mono">{v.sku}</span>
+                            <span>${v.price.toFixed(2)}</span>
+                          </div>
+                        ))}
                       </div>
-                      <Button type="button" variant="ghost" onClick={() => startEditProduct(pm.id)}>Edit</Button>
                     </div>
+                    <Button type="button" variant="ghost" onClick={() => startEditProduct(pm.id)}>Edit</Button>
                   </div>
-                ))}
-              </div>
-            </Card>
-          )}
+                </ListRow>
+              ))}
+            </div>
+          </Card>
         </div>
       )}
 
       {tab === 'purchase_orders' && (
-        <div className="space-y-4">
-          <form onSubmit={onCreatePo}>
-            <FormPanel title="Create purchase order">
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Vendor">
-                  <Select value={poVendor || defaultVendor} onChange={(e) => setPoVendor(e.target.value)}>
-                    {state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </Select>
-                </Field>
-                <Field label="PO number">
-                  <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="PO-1042" />
-                </Field>
-              </div>
-              <div className="space-y-2">
-                {poLines.map((line, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_72px_88px_auto] gap-2 items-end">
-                    <Field label={i === 0 ? 'Line — variant' : ''}>
-                      <Select value={line.productId || defaultVariant} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, productId: e.target.value } : r))}>
-                        {state.products.map((p) => <option key={p.id} value={p.id}>{p.sku}</option>)}
-                      </Select>
-                    </Field>
-                    <Field label={i === 0 ? 'Qty' : ''}>
-                      <Input type="number" value={line.qty} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, qty: e.target.value } : r))} min={1} />
-                    </Field>
-                    <Field label={i === 0 ? 'Unit cost' : ''}>
-                      <Input type="number" step="0.01" value={line.unitCost} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, unitCost: e.target.value } : r))} placeholder="auto" />
-                    </Field>
-                    {poLines.length > 1 && (
-                      <Button type="button" variant="ghost" onClick={() => setPoLines((rows) => rows.filter((_, j) => j !== i))}>×</Button>
-                    )}
-                  </div>
-                ))}
-                <Button type="button" variant="ghost" onClick={() => setPoLines((rows) => [...rows, { productId: defaultVariant, qty: '10', unitCost: '' }])}>+ line</Button>
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" checked={poSend} onChange={(e) => setPoSend(e.target.checked)} />
-                Send PO immediately
-              </label>
-              <Button type="submit" className="w-full">Create PO</Button>
-            </FormPanel>
-          </form>
-
-          <div className="space-y-2.5">
-            {state.purchaseOrders.length === 0 ? (
-              <Card className="p-4 text-sm text-slate-400">No purchase orders yet.</Card>
-            ) : state.purchaseOrders.map((po) => (
+        <div className="space-y-2">
+          <ListToolbar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="Search POs…"
+            count={filteredPos.length}
+            filters={
+              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="max-w-[140px]">
+                <option value="all">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="partially_received">Partial</option>
+                <option value="received">Received</option>
+              </Select>
+            }
+          />
+          <div className="space-y-1.5">
+            {filteredPos.length === 0 ? (
+              <Card className="p-3 text-sm text-slate-400">No purchase orders. Click + to create one.</Card>
+            ) : filteredPos.map((po) => (
               <Card key={po.id} className="p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-sm font-semibold">{po.poNumber ?? po.id.slice(0, 8) + '…'}</span>
@@ -878,221 +725,196 @@ export function Inventory() {
       )}
 
       {tab === 'receipts' && (
-        <div className="space-y-4">
-          <form onSubmit={onReceive} className="max-w-md">
-            <FormPanel title="Receive goods into location">
-              <Field label="Receiving location">
-                <WarehouseSelect value={rcvWarehouse} onChange={setRcvWarehouse} />
-              </Field>
-              <Field label="Vendor">
-                <Select value={rcvVendor || defaultVendor} onChange={(e) => setRcvVendor(e.target.value)}>
-                  {state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
-              </Field>
-              <Field label="Type">
-                <Select value={rcvType} onChange={(e) => setRcvType(e.target.value as 'commercial' | 'sample')}>
-                  <option value="commercial">Commercial (adds stock)</option>
-                  <option value="sample">Sample (no stock)</option>
-                </Select>
-              </Field>
-              <Field label="PO (optional)">
-                <Select value={rcvPo} onChange={(e) => setRcvPo(e.target.value)}>
-                  <option value="">— none —</option>
-                  {state.purchaseOrders.map((po) => (
-                    <option key={po.id} value={po.id}>{po.id.slice(0, 8)}… ({po.status})</option>
-                  ))}
-                </Select>
-              </Field>
-              {rcvType === 'commercial' && (
-                <Field label="Product">
-                  <Select value={rcvVariant || defaultVariant} onChange={(e) => setRcvVariant(e.target.value)}>
-                    {state.products.map((p) => <option key={p.id} value={p.id}>{p.sku}</option>)}
-                  </Select>
-                </Field>
-              )}
-              <Field label="Qty received">
-                <Input type="number" value={rcvQty} onChange={(e) => setRcvQty(e.target.value)} min={1} required />
-              </Field>
-              <Button type="submit" className="w-full">Record receipt</Button>
-            </FormPanel>
-          </form>
-
-          <div className="space-y-2.5">
-            {state.receipts.length === 0 ? (
-              <Card className="p-4 text-sm text-slate-400">No receipts yet.</Card>
-            ) : state.receipts.map((r) => (
-              <Card key={r.id} className="p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold">{r.id.slice(0, 8)}…</span>
+        <div className="space-y-2">
+          <ListToolbar search={search} onSearchChange={setSearch} placeholder="Search receipts…" count={filteredReceipts.length} />
+          <div className="space-y-1.5">
+            {filteredReceipts.length === 0 ? (
+              <Card className="p-3 text-sm text-slate-400">No receipts yet. Click + to record one.</Card>
+            ) : filteredReceipts.map((r) => (
+              <ListRow key={r.id}>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-xs font-semibold">{r.id.slice(0, 8)}…</span>
                   <Badge tone={r.type === 'sample' ? 'indigo' : 'sky'}>{r.type}</Badge>
-                  {r.warehouseCode && <Badge tone="slate">→ {r.warehouseCode}</Badge>}
-                  {r.poId && <Badge>matched to {r.poId.slice(0, 8)}…</Badge>}
-                  <span className="ml-auto text-xs text-slate-400">{vendorName(r.vendorId)} · {timeAgo(r.createdAt)}</span>
+                  {r.warehouseCode && <Badge tone="slate">{r.warehouseCode}</Badge>}
+                  <span className="ml-auto text-[11px] text-slate-400">{vendorName(r.vendorId)} · {timeAgo(r.createdAt)}</span>
                 </div>
-                <div className="mt-1.5 text-sm text-slate-600">
-                  {r.lines.map((l, i) => (
-                    <div key={i}>+{l.qty} — {l.description}</div>
-                  ))}
-                </div>
-                {r.discrepancy && (
-                  <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    ⚠ {r.discrepancy}
-                  </div>
-                )}
-              </Card>
+                <div className="text-xs text-slate-600">{r.lines.map((l, i) => <div key={i}>+{l.qty} {l.description}</div>)}</div>
+                {r.discrepancy && <div className="mt-1 text-xs text-amber-700">⚠ {r.discrepancy}</div>}
+              </ListRow>
             ))}
           </div>
         </div>
       )}
 
       {tab === 'adjustments' && (
-        <div className="space-y-4">
-          <form onSubmit={onAdjust} className="max-w-md">
-            <FormPanel title="Adjust stock at location">
-              <Field label="Location">
-                <WarehouseSelect value={adjWarehouse} onChange={setAdjWarehouse} />
-              </Field>
-              <Field label="Product">
-                <Select value={adjVariant || defaultVariant} onChange={(e) => setAdjVariant(e.target.value)}>
-                  {state.products.map((p) => <option key={p.id} value={p.id}>{p.sku} (total: {totalOnHand(p.id)})</option>)}
-                </Select>
-              </Field>
-              <Field label="Qty change (+/-)">
-                <Input type="number" value={adjQty} onChange={(e) => setAdjQty(e.target.value)} placeholder="-3 or +10" required />
-              </Field>
-              <Field label="Memo">
-                <Input value={adjMemo} onChange={(e) => setAdjMemo(e.target.value)} placeholder="Cycle count correction" />
-              </Field>
-              <Button type="submit" className="w-full">Post adjustment</Button>
-            </FormPanel>
-          </form>
-        </div>
+        <Card className="p-4 text-sm text-slate-500">Click <strong>+</strong> to post a stock adjustment at a location.</Card>
       )}
 
       {tab === 'ledger' && (
-        <Card>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
-                <th className="px-4 py-2.5 font-medium">SKU</th>
-                <th className="px-4 py-2.5 font-medium">Location</th>
-                <th className="px-4 py-2.5 font-medium text-right">Δ qty</th>
-                <th className="px-4 py-2.5 font-medium">Reason</th>
-                <th className="px-4 py-2.5 font-medium">Reference</th>
-                <th className="px-4 py-2.5 font-medium">When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.ledger.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No ledger entries yet.</td></tr>
-              ) : state.ledger.map((e) => {
-                const p = productById(e.productId)
-                return (
-                  <tr key={e.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{p?.sku ?? e.productId.slice(0, 8)}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">{e.warehouseCode ?? e.location ?? '—'}</td>
-                    <td className={`px-4 py-2.5 text-right font-medium ${e.qtyDelta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {e.qtyDelta > 0 ? `+${e.qtyDelta}` : e.qtyDelta}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-500">{e.reason.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-400">{e.refId.slice(0, 8)}…</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-400">{timeAgo(e.at)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </Card>
+        <div className="space-y-2">
+          <ListToolbar search={search} onSearchChange={setSearch} placeholder="Search ledger…" count={filteredLedger.length} />
+          <Card className="overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="px-3 py-2 font-medium">SKU</th>
+                  <th className="px-3 py-2 font-medium">Location</th>
+                  <th className="px-3 py-2 font-medium text-right">Δ</th>
+                  <th className="px-3 py-2 font-medium">Reason</th>
+                  <th className="px-3 py-2 font-medium">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLedger.length === 0 ? (
+                  <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-400">No ledger entries.</td></tr>
+                ) : filteredLedger.map((e) => {
+                  const p = productById(e.productId)
+                  return (
+                    <tr key={e.id} className="border-b border-slate-50 last:border-0">
+                      <td className="px-3 py-1.5 font-mono text-xs">{p?.sku ?? e.productId.slice(0, 8)}</td>
+                      <td className="px-3 py-1.5 text-xs text-slate-500">{e.warehouseCode ?? '—'}</td>
+                      <td className={`px-3 py-1.5 text-right text-xs font-medium ${e.qtyDelta > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{e.qtyDelta > 0 ? `+${e.qtyDelta}` : e.qtyDelta}</td>
+                      <td className="px-3 py-1.5 text-xs text-slate-500">{e.reason.replace(/_/g, ' ')}</td>
+                      <td className="px-3 py-1.5 text-[11px] text-slate-400">{timeAgo(e.at)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </Card>
+        </div>
       )}
 
       {tab === 'warehouses' && (
-        <div className="space-y-4">
-          <form onSubmit={onAddWarehouse} className="max-w-2xl">
-            <FormPanel title={editTarget?.kind === 'warehouse' ? 'Edit location' : 'Add warehouse / location'}>
-              {editTarget?.kind === 'warehouse' && (
-                <div className="mb-2 flex justify-end">
-                  <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Code">
-                  <Input value={whCode} onChange={(e) => setWhCode(e.target.value)} placeholder="3PL-WEST" required disabled={editTarget?.kind === 'warehouse'} />
-                </Field>
-                <Field label="Name">
-                  <Input value={whName} onChange={(e) => setWhName(e.target.value)} placeholder="West coast 3PL" required />
-                </Field>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Field label="Contact name">
-                  <Input value={whContactName} onChange={(e) => setWhContactName(e.target.value)} placeholder="Receiving desk" />
-                </Field>
-                <Field label="Contact email">
-                  <Input type="email" value={whContactEmail} onChange={(e) => setWhContactEmail(e.target.value)} placeholder="ops@3pl.com" />
-                </Field>
-                <Field label="Contact phone">
-                  <Input value={whContactPhone} onChange={(e) => setWhContactPhone(e.target.value)} placeholder="+1 732-555-0300" />
-                </Field>
-              </div>
-              <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                <div className="mb-2 text-xs font-medium text-slate-500">Address</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Line 1">
-                    <Input value={whAddrLine1} onChange={(e) => setWhAddrLine1(e.target.value)} placeholder="88 Industrial Pkwy" />
-                  </Field>
-                  <Field label="Line 2">
-                    <Input value={whAddrLine2} onChange={(e) => setWhAddrLine2(e.target.value)} placeholder="Unit 4" />
-                  </Field>
-                  <Field label="City">
-                    <Input value={whCity} onChange={(e) => setWhCity(e.target.value)} placeholder="Newark" />
-                  </Field>
-                  <Field label="State / province">
-                    <Input value={whState} onChange={(e) => setWhState(e.target.value)} placeholder="NJ" />
-                  </Field>
-                  <Field label="Postal code">
-                    <Input value={whPostal} onChange={(e) => setWhPostal(e.target.value)} placeholder="07114" />
-                  </Field>
-                  <Field label="Country">
-                    <Input value={whCountry} onChange={(e) => setWhCountry(e.target.value)} placeholder="US" />
-                  </Field>
-                </div>
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" checked={whDefault} onChange={(e) => setWhDefault(e.target.checked)} />
-                Set as default receiving location
-              </label>
-              <Button type="submit" className="w-full">{editTarget?.kind === 'warehouse' ? 'Save location' : 'Create location'}</Button>
-            </FormPanel>
-          </form>
-
-          {!editTarget && (
-          <div className="space-y-2.5">
-            {state.warehouses.length === 0 ? (
-              <Card className="p-4 text-sm text-slate-400">No locations yet — a default MAIN warehouse is created per tenant in live mode.</Card>
-            ) : state.warehouses.map((w) => (
-              <Card key={w.id} className="p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold">{w.code}</span>
-                  <span className="text-sm text-slate-600">{w.name}</span>
+        <div className="space-y-2">
+          <ListToolbar search={search} onSearchChange={setSearch} placeholder="Search locations…" count={filteredWarehouses.length} />
+          <div className="space-y-1.5">
+            {filteredWarehouses.length === 0 ? (
+              <Card className="p-3 text-sm text-slate-400">No locations. Click + to add one.</Card>
+            ) : filteredWarehouses.map((w) => (
+              <ListRow key={w.id}>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-xs font-semibold">{w.code}</span>
+                  <span className="text-sm">{w.name}</span>
                   {w.isDefault && <Badge tone="emerald">default</Badge>}
                   <Button type="button" variant="ghost" className="ml-auto" onClick={() => startEditWarehouse(w.id)}>Edit</Button>
                 </div>
-                {(w.contactName || w.contactEmail || w.contactPhone) && (
-                  <div className="mt-1 text-xs text-slate-500">
-                    {[w.contactName, w.contactEmail, w.contactPhone].filter(Boolean).join(' · ')}
-                  </div>
-                )}
-                {formatAddress(w.address) && (
-                  <div className="mt-1 text-xs text-slate-500">{formatAddress(w.address)}</div>
-                )}
-                <div className="mt-2 text-xs text-slate-500">
-                  {state.stockByWarehouse.filter((s) => s.warehouseId === w.id && s.onHand > 0).length} SKUs with stock
-                </div>
-              </Card>
+                {formatAddress(w.address) && <div className="text-[11px] text-slate-500">{formatAddress(w.address)}</div>}
+              </ListRow>
             ))}
           </div>
-          )}
         </div>
       )}
+
+      {/* Modals */}
+      <Modal open={modal?.kind === 'vendor'} title={modalIsEdit(modal) ? 'Edit vendor' : 'Add vendor'} onClose={closeModal}>
+        <form onSubmit={onAddVendor}><FormPanel title="">
+          <Field label="Name"><Input value={vendorNameInput} onChange={(e) => setVendorNameInput(e.target.value)} required /></Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Email"><Input type="email" value={vendorEmail} onChange={(e) => setVendorEmail(e.target.value)} /></Field>
+            <Field label="Phone"><Input value={vendorPhone} onChange={(e) => setVendorPhone(e.target.value)} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Lead time (days)"><Input type="number" value={vendorLead} onChange={(e) => setVendorLead(e.target.value)} /></Field>
+            <Field label="Payment terms"><Input value={vendorPaymentTerms} onChange={(e) => setVendorPaymentTerms(e.target.value)} /></Field>
+          </div>
+          <Field label="Notes"><TextArea value={vendorNotes} onChange={(e) => setVendorNotes(e.target.value)} /></Field>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={vendorRecurring} onChange={(e) => setVendorRecurring(e.target.checked)} /> Recurring vendor</label>
+          <Button type="submit" className="w-full">{modalIsEdit(modal) ? 'Save' : 'Create'}</Button>
+        </FormPanel></form>
+      </Modal>
+
+      <Modal open={modal?.kind === 'product'} title={modalIsEdit(modal) ? 'Edit product' : 'Add product'} onClose={closeModal} wide>
+        <form onSubmit={onAddProduct}><FormPanel title="">
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Title"><Input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} required /></Field>
+            <Field label="Brand"><Input value={productBrand} onChange={(e) => setProductBrand(e.target.value)} /></Field>
+          </div>
+          <Field label="Description"><TextArea value={productDesc} onChange={(e) => setProductDesc(e.target.value)} /></Field>
+          {modal?.kind === 'product' && modalIsEdit(modal) ? (
+            <table className="w-full text-sm">
+              <thead><tr className="text-[11px] uppercase text-slate-400"><th className="py-1">Variant</th><th>SKU</th><th>Price</th><th>Cost</th></tr></thead>
+              <tbody>{editVariants.map((row, i) => (
+                <tr key={row.id}><td className="py-1 text-xs">{row.title}</td>
+                  <td><Input value={row.sku} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, sku: e.target.value } : r))} className="font-mono text-xs" /></td>
+                  <td><Input type="number" value={row.price} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, price: e.target.value } : r))} /></td>
+                  <td><Input type="number" value={row.unitCost} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, unitCost: e.target.value } : r))} /></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Base SKU"><Input value={productSku} onChange={(e) => setProductSku(e.target.value)} required /></Field>
+                <Field label="Reorder pt"><Input type="number" value={productReorder} onChange={(e) => setProductReorder(e.target.value)} /></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Price"><Input type="number" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} /></Field>
+                <Field label="Unit cost"><Input type="number" value={productCost} onChange={(e) => setProductCost(e.target.value)} /></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Option 1"><Input value={opt1Values} onChange={(e) => setOpt1Values(e.target.value)} placeholder="S, M, L" /></Field>
+                <Field label="Option 2"><Input value={opt2Values} onChange={(e) => setOpt2Values(e.target.value)} placeholder="Blue, Black" /></Field>
+              </div>
+            </>
+          )}
+          <Button type="submit" className="w-full">{modalIsEdit(modal) ? 'Save product' : 'Create product'}</Button>
+        </FormPanel></form>
+      </Modal>
+
+      <Modal open={modal?.kind === 'po'} title="Create purchase order" onClose={closeModal} wide>
+        <form onSubmit={onCreatePo}><FormPanel title="">
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Vendor"><Select value={poVendor || defaultVendor} onChange={(e) => setPoVendor(e.target.value)}>{state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</Select></Field>
+            <Field label="PO #"><Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} /></Field>
+          </div>
+          {poLines.map((line, i) => (
+            <div key={i} className="grid grid-cols-[1fr_72px_88px] gap-2">
+              <Select value={line.productId || defaultVariant} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, productId: e.target.value } : r))}>{state.products.map((p) => <option key={p.id} value={p.id}>{p.sku}</option>)}</Select>
+              <Input type="number" value={line.qty} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, qty: e.target.value } : r))} />
+              <Input type="number" step="0.01" value={line.unitCost} onChange={(e) => setPoLines((rows) => rows.map((r, j) => j === i ? { ...r, unitCost: e.target.value } : r))} />
+            </div>
+          ))}
+          <Button type="button" variant="ghost" onClick={() => setPoLines((rows) => [...rows, { productId: defaultVariant, qty: '10', unitCost: '' }])}>+ line</Button>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={poSend} onChange={(e) => setPoSend(e.target.checked)} /> Send immediately</label>
+          <Button type="submit" className="w-full">Create PO</Button>
+        </FormPanel></form>
+      </Modal>
+
+      <Modal open={modal?.kind === 'receipt'} title="Record receipt" onClose={closeModal}>
+        <form onSubmit={onReceive}><FormPanel title="">
+          <Field label="Location"><WarehouseSelect value={rcvWarehouse} onChange={setRcvWarehouse} /></Field>
+          <Field label="Vendor"><Select value={rcvVendor || defaultVendor} onChange={(e) => setRcvVendor(e.target.value)}>{state.vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</Select></Field>
+          <Field label="Type"><Select value={rcvType} onChange={(e) => setRcvType(e.target.value as 'commercial' | 'sample')}><option value="commercial">Commercial</option><option value="sample">Sample</option></Select></Field>
+          <Field label="PO (optional)"><Select value={rcvPo} onChange={(e) => setRcvPo(e.target.value)}><option value="">—</option>{state.purchaseOrders.map((po) => <option key={po.id} value={po.id}>{po.id.slice(0, 8)}</option>)}</Select></Field>
+          {rcvType === 'commercial' && <Field label="Product"><Select value={rcvVariant || defaultVariant} onChange={(e) => setRcvVariant(e.target.value)}>{state.products.map((p) => <option key={p.id} value={p.id}>{p.sku}</option>)}</Select></Field>}
+          <Field label="Qty"><Input type="number" value={rcvQty} onChange={(e) => setRcvQty(e.target.value)} required /></Field>
+          <Button type="submit" className="w-full">Record receipt</Button>
+        </FormPanel></form>
+      </Modal>
+
+      <Modal open={modal?.kind === 'adjustment'} title="Adjust stock" onClose={closeModal}>
+        <form onSubmit={onAdjust}><FormPanel title="">
+          <Field label="Location"><WarehouseSelect value={adjWarehouse} onChange={setAdjWarehouse} /></Field>
+          <Field label="Product"><Select value={adjVariant || defaultVariant} onChange={(e) => setAdjVariant(e.target.value)}>{state.products.map((p) => <option key={p.id} value={p.id}>{p.sku}</option>)}</Select></Field>
+          <Field label="Qty change (+/-)"><Input type="number" value={adjQty} onChange={(e) => setAdjQty(e.target.value)} required /></Field>
+          <Field label="Memo"><Input value={adjMemo} onChange={(e) => setAdjMemo(e.target.value)} /></Field>
+          <Button type="submit" className="w-full">Post adjustment</Button>
+        </FormPanel></form>
+      </Modal>
+
+      <Modal open={modal?.kind === 'warehouse'} title={modalIsEdit(modal) ? 'Edit location' : 'Add location'} onClose={closeModal} wide>
+        <form onSubmit={onAddWarehouse}><FormPanel title="">
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Code"><Input value={whCode} onChange={(e) => setWhCode(e.target.value)} required disabled={modalIsEdit(modal)} /></Field>
+            <Field label="Name"><Input value={whName} onChange={(e) => setWhName(e.target.value)} required /></Field>
+          </div>
+          <Field label="Contact email"><Input value={whContactEmail} onChange={(e) => setWhContactEmail(e.target.value)} /></Field>
+          <Field label="Address line 1"><Input value={whAddrLine1} onChange={(e) => setWhAddrLine1(e.target.value)} /></Field>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={whDefault} onChange={(e) => setWhDefault(e.target.checked)} /> Default location</label>
+          <Button type="submit" className="w-full">{modalIsEdit(modal) ? 'Save' : 'Create'}</Button>
+        </FormPanel></form>
+      </Modal>
     </div>
   )
 }
