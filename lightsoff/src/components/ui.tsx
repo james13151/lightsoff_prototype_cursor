@@ -137,3 +137,32 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={`${inputClass} min-h-[72px] resize-y ${props.className ?? ''}`} />
 }
+
+export function SubTabs<T extends string>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: { id: T; label: string }[]
+  active: T
+  onChange: (id: T) => void
+}) {
+  return (
+    <div className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 pb-px">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={`rounded-t-lg px-3 py-2 text-sm font-medium transition-colors ${
+            active === tab.id
+              ? 'border border-b-white border-slate-200 bg-white text-slate-900 -mb-px'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+}

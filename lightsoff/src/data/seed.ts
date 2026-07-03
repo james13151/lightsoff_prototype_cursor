@@ -1,5 +1,5 @@
 import type {
-  Vendor, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
+  Vendor, Warehouse, StockByWarehouse, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
 } from '../types'
 
@@ -19,6 +19,21 @@ export const vendors: Vendor[] = [
   { id: 'v2', name: 'Pacific Trims Co.', leadTimeDays: 8, isRecurring: true },
   { id: 'v3', name: 'Northwind Packaging', leadTimeDays: 5, isRecurring: true },
   { id: 'v4', name: 'Kyoto Fabric Lab', leadTimeDays: 21, isRecurring: false },
+]
+
+export const warehouses: Warehouse[] = [
+  { id: 'wh-main', code: 'MAIN', name: 'Main warehouse', isDefault: true },
+  { id: 'wh-3pl', code: '3PL-EAST', name: 'East coast 3PL', isDefault: false },
+]
+
+export const stockByWarehouse: StockByWarehouse[] = [
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p1', sku: 'HOOD-BLU-M', onHand: 14, reorderPoint: 20 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p2', sku: 'HOOD-BLU-L', onHand: 42, reorderPoint: 20 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p3', sku: 'TEE-RED-S', onHand: 0, reorderPoint: 15 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p4', sku: 'TEE-RED-M', onHand: 8, reorderPoint: 15 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p5', sku: 'CAP-BLK-OS', onHand: 62, reorderPoint: 25 },
+  { warehouseId: 'wh-3pl', warehouseCode: '3PL-EAST', warehouseName: 'East coast 3PL', isDefault: false, variantId: 'p5', sku: 'CAP-BLK-OS', onHand: 35, reorderPoint: 25 },
+  { warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse', isDefault: true, variantId: 'p6', sku: 'TOTE-NAT-OS', onHand: 31, reorderPoint: 10 },
 ]
 
 export const products: Product[] = [
@@ -50,7 +65,8 @@ export const purchaseOrders: PurchaseOrder[] = [
 
 export const receipts: Receipt[] = [
   {
-    id: 'RCV-311', poId: 'PO-1041', vendorId: 'v2', type: 'commercial', createdAt: daysAgo(4),
+    id: 'RCV-311', poId: 'PO-1041', vendorId: 'v2', type: 'commercial', warehouseId: 'wh-main', warehouseCode: 'MAIN', warehouseName: 'Main warehouse',
+    createdAt: daysAgo(4),
     lines: [{ productId: 'p5', description: 'Black Cap (One Size)', qty: 97 }],
     discrepancy: 'Received 97 of 100 ordered — 3 units short vs PO-1041.',
   },
@@ -62,7 +78,7 @@ export const receipts: Receipt[] = [
 ]
 
 export const ledger: InventoryLedgerEntry[] = [
-  { id: 'il1', productId: 'p5', qtyDelta: 97, reason: 'po_receipt', refId: 'RCV-311', at: daysAgo(4) },
+  { id: 'il1', productId: 'p5', qtyDelta: 97, reason: 'po_receipt', refId: 'RCV-311', at: daysAgo(4), warehouseId: 'wh-main', warehouseCode: 'MAIN', location: 'MAIN' },
   { id: 'il2', productId: 'p1', qtyDelta: -3, reason: 'shopify_sale', refId: 'shopify#5521', at: daysAgo(1) },
   { id: 'il3', productId: 'p3', qtyDelta: -4, reason: 'shopify_sale', refId: 'shopify#5520', at: daysAgo(1) },
   { id: 'il4', productId: 'p4', qtyDelta: -5, reason: 'shopify_sale', refId: 'shopify#5519', at: daysAgo(2) },

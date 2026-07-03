@@ -1,4 +1,6 @@
 import { apiFetch } from './client'
+import { cartesianProduct, variantSku, variantTitle } from '../lib/matrix'
+import type { POLineItem, VendorBillLine } from '../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>
@@ -41,38 +43,83 @@ export async function createProduct(
   tenantId: string,
   data: {
     title: string
-    sku: string
-    variantTitle?: string
+    description?: string
+    brand?: string
+    productType?: string
+    defaultVendorId?: string
+    customAttributes?: Record<string, unknown>
+    baseSku: string
+    options?: { name: string; values: string[] }[]
     price?: number
     unitCost?: number
     reorderPoint?: number
+    variants?: {
+      sku: string
+      title?: string
+      optionValues?: Record<string, string>
+      price?: number
+      unitCost?: number
+      reorderPoint?: number
+      barcode?: string
+    }[]
   },
 ) {
+  const options = (data.options ?? []).filter((o) => o.name.trim() && o.values.length > 0)
+  let variants = data.variants
+  if (!variants?.length) {
+    const combos = options.length ? cartesianProduct(options) : [{}]
+    variants = combos.map((ov) => ({
+      sku: variantSku(data.baseSku, ov),
+      title: Object.keys(ov).length ? variantTitle(ov) : undefined,
+      optionValues: ov,
+      price: data.price,
+      unitCost: data.unitCost,
+      reorderPoint: data.reorderPoint,
+    }))
+  }
   return post(token, '/v1/products', {
     tenant_id: tenantId,
     title: data.title,
-    variants: [{
-      sku: data.sku,
-      title: data.variantTitle,
-      price: data.price,
-      unit_cost: data.unitCost,
-      reorder_point: data.reorderPoint,
-    }],
+    description: data.description,
+    brand: data.brand,
+    product_type: data.productType,
+    default_vendor_id: data.defaultVendorId,
+    custom_attributes: data.customAttributes,
+    options: options.map((o) => ({ name: o.name, values: o.values })),
+    variants: variants.map((v) => ({
+      sku: v.sku,
+      title: v.title,
+      price: v.price,
+      unit_cost: v.unitCost,
+      reorder_point: v.reorderPoint,
+      barcode: v.barcode,
+      option_values: v.optionValues,
+    })),
   })
 }
 
 export async function createPurchaseOrder(
   token: string,
   tenantId: string,
-  data: { vendorId: string; lines: { variantId: string; qty: number; unitCost?: number }[]; notes?: string; send?: boolean },
+  data: {
+    vendorId: string
+    lines: POLineItem[]
+    notes?: string
+    poNumber?: string
+    expectedAt?: string
+    send?: boolean
+  },
 ) {
   const po = await post(token, '/v1/purchase-orders', {
     tenant_id: tenantId,
     vendor_id: data.vendorId,
     source: 'manual',
     notes: data.notes,
+    po_number: data.poNumber,
+    expected_at: data.expectedAt,
     lines: data.lines.map((l) => ({
-      variant_id: l.variantId,
+      variant_id: l.productId,
+      description: l.description,
       qty: l.qty,
       unit_cost: l.unitCost,
     })),
@@ -83,12 +130,27 @@ export async function createPurchaseOrder(
   return po
 }
 
+export async function createWarehouse(
+  token: string,
+  tenantId: string,
+  data: { code: string; name: string; isDefault?: boolean; address?: Record<string, unknown> },
+) {
+  return post(token, '/v1/warehouses', {
+    tenant_id: tenantId,
+    code: data.code,
+    name: data.name,
+    is_default: data.isDefault,
+    address: data.address,
+  })
+}
+
 export async function createReceipt(
   token: string,
   tenantId: string,
   data: {
     vendorId: string
     poId?: string
+    warehouseId?: string
     type?: 'commercial' | 'sample'
     lines: { variantId?: string; description?: string; qty: number; poLineItemId?: string }[]
     notes?: string
@@ -98,6 +160,7 @@ export async function createReceipt(
     tenant_id: tenantId,
     vendor_id: data.vendorId,
     po_id: data.poId,
+    warehouse_id: data.warehouseId,
     type: data.type ?? 'commercial',
     notes: data.notes,
     lines: data.lines.map((l) => ({
@@ -112,12 +175,13 @@ export async function createReceipt(
 export async function adjustInventory(
   token: string,
   tenantId: string,
-  data: { variantId: string; qtyDelta: number; memo?: string },
+  data: { variantId: string; qtyDelta: number; warehouseId?: string; memo?: string },
 ) {
   return post(token, '/v1/inventory-adjustments', {
     tenant_id: tenantId,
     variant_id: data.variantId,
     qty_delta: data.qtyDelta,
+    warehouse_id: data.warehouseId,
     memo: data.memo,
   })
 }
@@ -127,30 +191,46 @@ export async function createBill(
   tenantId: string,
   data: {
     vendorId: string
-    amount: number
-    dueDate?: string
+    lines: VendorBillLine[]
     billNumber?: string
-    memo?: string
     poId?: string
+    receiptId?: string
+    dueDate?: string
+    memo?: string
     expenseAccountCode?: string
   },
 ) {
   return post(token, '/v1/bills', {
     tenant_id: tenantId,
     vendor_id: data.vendorId,
-    amount: data.amount,
-    due_date: data.dueDate,
     bill_number: data.billNumber,
-    memo: data.memo,
     po_id: data.poId,
+    receipt_id: data.receiptId,
+    due_date: data.dueDate,
+    memo: data.memo,
     expense_account_code: data.expenseAccountCode,
+    lines: data.lines.map((l) => ({
+      variant_id: l.productId,
+      description: l.description,
+      qty: l.qty,
+      unit_cost: l.unitCost,
+      line_amount: l.lineAmount,
+      po_line_item_id: l.poLineItemId,
+      receipt_line_item_id: l.receiptLineItemId,
+    })),
   })
 }
 
 export async function recordPayment(
   token: string,
   tenantId: string,
-  data: { vendorId: string; amount: number; billId: string; method?: string; memo?: string },
+  data: {
+    vendorId: string
+    amount: number
+    allocations: { billId: string; amount: number }[]
+    method?: string
+    memo?: string
+  },
 ) {
   return post(token, '/v1/payments', {
     tenant_id: tenantId,
@@ -158,7 +238,7 @@ export async function recordPayment(
     amount: data.amount,
     method: data.method,
     memo: data.memo,
-    allocations: [{ bill_id: data.billId, amount: data.amount }],
+    allocations: data.allocations.map((a) => ({ bill_id: a.billId, amount: a.amount })),
   })
 }
 

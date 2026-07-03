@@ -110,9 +110,29 @@ export function financeRoutes(app: FastifyInstance) {
     return withUser(req.userId, async (db) => {
       const r = await db.query(
         `select b.*, v.name as vendor_name,
-                coalesce((select sum(a.amount) from app.vendor_payment_allocations a where a.bill_id = b.id), 0) as amount_paid
-           from app.vendor_bills b join app.vendors v on v.id = b.vendor_id
+                po.po_number,
+                coalesce((select sum(a.amount) from app.vendor_payment_allocations a where a.bill_id = b.id), 0) as amount_paid,
+                coalesce(jsonb_agg(jsonb_build_object(
+                  'id', bl.id, 'line_number', bl.line_number,
+                  'variant_id', bl.variant_id, 'description', bl.description,
+                  'qty', bl.qty, 'unit_cost', bl.unit_cost, 'line_amount', bl.line_amount,
+                  'po_line_item_id', bl.po_line_item_id, 'receipt_line_item_id', bl.receipt_line_item_id
+                ) order by bl.line_number) filter (where bl.id is not null), '[]') as lines,
+                coalesce((
+                  select jsonb_agg(jsonb_build_object(
+                    'payment_id', a.payment_id, 'amount', a.amount,
+                    'paid_at', p.paid_at, 'method', p.method
+                  ) order by p.paid_at)
+                  from app.vendor_payment_allocations a
+                  join app.vendor_payments p on p.id = a.payment_id
+                  where a.bill_id = b.id
+                ), '[]') as payments
+           from app.vendor_bills b
+           join app.vendors v on v.id = b.vendor_id
+           left join app.purchase_orders po on po.id = b.po_id
+           left join app.vendor_bill_lines bl on bl.bill_id = b.id
           where b.tenant_id = $1 and ($2::app.bill_status is null or b.status = $2)
+          group by b.id, v.name, po.po_number
           order by b.due_date nulls last`,
         [tenant_id, status ?? null],
       )
@@ -122,27 +142,46 @@ export function financeRoutes(app: FastifyInstance) {
 
   app.post<{
     Body: {
-      tenant_id: string; vendor_id: string; amount: number; bill_number?: string
-      po_id?: string; due_date?: string; memo?: string; expense_account_code?: string
+      tenant_id: string; vendor_id: string; amount?: number; bill_number?: string
+      po_id?: string; receipt_id?: string; due_date?: string; memo?: string; expense_account_code?: string
+      lines?: {
+        variant_id?: string; description?: string; qty?: number; unit_cost?: number; line_amount?: number
+        po_line_item_id?: string; receipt_line_item_id?: string; expense_account_code?: string
+      }[]
     }
   }>('/v1/bills', async (req, reply) => {
-    const { tenant_id, vendor_id, amount, bill_number, po_id, due_date, memo, expense_account_code } = req.body ?? {}
-    if (!tenant_id || !vendor_id || !amount) {
-      return reply.code(400).send({ error: 'tenant_id, vendor_id and amount are required' })
+    const { tenant_id, vendor_id, amount, bill_number, po_id, receipt_id, due_date, memo, expense_account_code, lines } = req.body ?? {}
+    if (!tenant_id || !vendor_id) {
+      return reply.code(400).send({ error: 'tenant_id and vendor_id are required' })
+    }
+    const billLines = Array.isArray(lines) && lines.length > 0
+      ? lines
+      : amount
+        ? [{ description: memo ?? 'Bill line', qty: 1, unit_cost: amount, line_amount: amount }]
+        : null
+    if (!billLines) {
+      return reply.code(400).send({ error: 'lines or amount is required' })
     }
     try {
-      const bill = await withUser(req.userId, async (db) => {
+      const billId = await withUser(req.userId, async (db) => {
         const r = await db.query(
-          `insert into app.vendor_bills
-             (tenant_id, vendor_id, amount, bill_number, po_id, due_date, memo, expense_account_id, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7, app.account_id_by_code($1, coalesce($8, '1200')), $9)
-           returning *`,
-          [tenant_id, vendor_id, amount, bill_number ?? null, po_id ?? null, due_date ?? null, memo ?? null, expense_account_code ?? null, req.userId],
+          `select app.create_vendor_bill($1, $2, $3, $4, $5, $6, $7, $8, $9) as id`,
+          [
+            tenant_id, vendor_id, JSON.stringify(billLines),
+            bill_number ?? null, po_id ?? null, receipt_id ?? null,
+            due_date ?? null, memo ?? null, expense_account_code ?? '1200',
+          ],
         )
+        return r.rows[0].id as string
+      })
+      const bill = await withUser(req.userId, async (db) => {
+        const r = await db.query(`select * from app.vendor_bills where id = $1`, [billId])
         return r.rows[0]
       })
       return reply.code(201).send(bill)
     } catch (err) {
+      const friendly = friendlyDbError(err)
+      if (friendly) return reply.code(400).send({ error: friendly })
       if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
       throw err
     }
@@ -150,6 +189,29 @@ export function financeRoutes(app: FastifyInstance) {
 
   // One call records the payment and allocates it; the DB posts AP<-Cash and
   // rolls bill status (partially_paid/paid) + emits bill.paid.
+  app.get<{ Querystring: { tenant_id?: string } }>('/v1/payments', async (req, reply) => {
+    const { tenant_id } = req.query
+    if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
+    return withUser(req.userId, async (db) => {
+      const r = await db.query(
+        `select p.*, v.name as vendor_name,
+                coalesce(jsonb_agg(jsonb_build_object(
+                  'bill_id', a.bill_id, 'amount', a.amount,
+                  'bill_number', b.bill_number, 'bill_status', b.status
+                ) order by a.bill_id) filter (where a.id is not null), '[]') as allocations
+           from app.vendor_payments p
+           join app.vendors v on v.id = p.vendor_id
+           left join app.vendor_payment_allocations a on a.payment_id = p.id
+           left join app.vendor_bills b on b.id = a.bill_id
+          where p.tenant_id = $1
+          group by p.id, v.name
+          order by p.paid_at desc limit 200`,
+        [tenant_id],
+      )
+      return r.rows
+    })
+  })
+
   app.post<{
     Body: { tenant_id: string; vendor_id: string; amount: number; method?: string; memo?: string; allocations: { bill_id: string; amount: number }[] }
   }>('/v1/payments', async (req, reply) => {

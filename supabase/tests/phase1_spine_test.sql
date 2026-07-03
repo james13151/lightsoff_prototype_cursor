@@ -187,9 +187,33 @@ $$;
 -- Bill -> auto journal (Inventory <- AP), partial + final payments,
 -- allocation guards, bill.paid event
 -- ---------------------------------------------------------------------------
-insert into app.vendor_bills (tenant_id, vendor_id, po_id, bill_number, amount, due_date)
-select tid, vendor_id, po_id, 'INV-100', 1850.00, current_date + 14 from t_ctx;
-update t_ctx set bill_id = (select id from app.vendor_bills b join t_ctx c on b.tenant_id = c.tid);
+do $$
+declare
+  c t_ctx;
+  new_bill_id uuid;
+begin
+  select * into c from t_ctx;
+  new_bill_id := app.create_vendor_bill(
+    c.tid,
+    c.vendor_id,
+    jsonb_build_array(jsonb_build_object(
+      'description', 'PO inventory',
+      'qty', 1,
+      'unit_cost', 1850.00,
+      'line_amount', 1850.00,
+      'po_line_item_id', c.po_line_id,
+      'expense_account_code', '1200'
+    )),
+    'INV-100',
+    c.po_id,
+    null,
+    current_date + 14,
+    'PO inventory bill',
+    '1200'
+  );
+  update t_ctx set bill_id = new_bill_id;
+end;
+$$;
 
 do $$
 declare

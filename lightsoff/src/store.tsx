@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useState, type ReactNode } from 'react'
 import type {
-  Vendor, Product, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill,
+  Vendor, Warehouse, StockByWarehouse, Product, ProductMaster, PurchaseOrder, Receipt, InventoryLedgerEntry, VendorBill, VendorPayment,
   JournalEntry, ExpenseClaim, Campaign, Conversation, KanbanCard, Ticket, BusEvent,
   Settings, CaptureDraft, CardStage,
 } from './types'
@@ -10,11 +10,15 @@ import { fetchSpineSnapshot, executeSpineAction, type SpineSnapshot, type Financ
 
 export interface AppState {
   vendors: Vendor[]
+  warehouses: Warehouse[]
+  stockByWarehouse: StockByWarehouse[]
   products: Product[]
+  productMasters: ProductMaster[]
   purchaseOrders: PurchaseOrder[]
   receipts: Receipt[]
   ledger: InventoryLedgerEntry[]
   bills: VendorBill[]
+  payments: VendorPayment[]
   journal: JournalEntry[]
   claims: ExpenseClaim[]
   campaigns: Campaign[]
@@ -30,11 +34,15 @@ export interface AppState {
 
 const initialState: AppState = {
   vendors: seed.vendors,
+  warehouses: seed.warehouses,
+  stockByWarehouse: seed.stockByWarehouse,
   products: seed.products,
+  productMasters: [],
   purchaseOrders: seed.purchaseOrders,
   receipts: seed.receipts,
   ledger: seed.ledger,
   bills: seed.bills,
+  payments: [],
   journal: seed.journal,
   claims: seed.claims,
   campaigns: seed.campaigns,
@@ -65,10 +73,11 @@ type Action =
   | { type: 'SET_TOAST'; message: string | null }
   | { type: 'HYDRATE'; spine: SpineSnapshot }
   | { type: 'ADD_VENDOR'; name: string; leadTimeDays?: number }
+  | { type: 'CREATE_WAREHOUSE'; code: string; name: string; isDefault?: boolean }
   | { type: 'ADD_PRODUCT'; title: string; sku: string; price?: number; unitCost?: number; reorderPoint?: number }
   | { type: 'CREATE_PO'; vendorId: string; variantId: string; qty: number; unitCost: number; send?: boolean }
-  | { type: 'CREATE_RECEIPT'; vendorId: string; poId?: string; variantId: string; qty: number; receiptType?: 'commercial' | 'sample'; description?: string }
-  | { type: 'ADJUST_STOCK'; variantId: string; qtyDelta: number; memo?: string }
+  | { type: 'CREATE_RECEIPT'; vendorId: string; poId?: string; variantId: string; qty: number; warehouseId?: string; receiptType?: 'commercial' | 'sample'; description?: string }
+  | { type: 'ADJUST_STOCK'; variantId: string; qtyDelta: number; warehouseId?: string; memo?: string }
   | { type: 'CREATE_BILL'; vendorId: string; amount: number; dueDate?: string; memo?: string }
   | { type: 'CREATE_EXPENSE_CLAIM'; vendorName: string; amount: number; category: string; autoApprove?: boolean }
   | { type: 'CREATE_JOURNAL'; memo: string; lines: { account: string; debit: number; credit: number }[] }
@@ -229,11 +238,15 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         vendors: action.spine.vendors,
+        warehouses: action.spine.warehouses,
+        stockByWarehouse: action.spine.stockByWarehouse,
         products: action.spine.products,
+        productMasters: action.spine.productMasters,
         purchaseOrders: action.spine.purchaseOrders,
         receipts: action.spine.receipts,
         ledger: action.spine.ledger,
         bills: action.spine.bills,
+        payments: action.spine.payments,
         journal: action.spine.journal,
         claims: action.spine.claims,
         events: action.spine.events,
@@ -251,6 +264,23 @@ function reducer(state: AppState, action: Action): AppState {
         vendors: [...state.vendors, vendor],
         events: pushEvent(state, 'vendor.created', 'Inventory', `Vendor "${action.name}" added`),
         toast: `Vendor "${action.name}" created.`,
+      }
+    }
+    case 'CREATE_WAREHOUSE': {
+      const warehouse: Warehouse = {
+        id: nid('wh'),
+        code: action.code.toUpperCase(),
+        name: action.name,
+        isDefault: action.isDefault ?? false,
+      }
+      const warehouses = action.isDefault
+        ? state.warehouses.map((w) => ({ ...w, isDefault: false }))
+        : state.warehouses
+      return {
+        ...state,
+        warehouses: [...warehouses, warehouse],
+        events: pushEvent(state, 'warehouse.created', 'Inventory', `Location ${action.code} added`),
+        toast: `Warehouse ${action.code} created.`,
       }
     }
     case 'ADD_PRODUCT': {
@@ -290,11 +320,17 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'CREATE_RECEIPT': {
       const product = action.variantId ? state.products.find((p) => p.id === action.variantId) : undefined
+      const warehouse = action.warehouseId
+        ? state.warehouses.find((w) => w.id === action.warehouseId)
+        : state.warehouses.find((w) => w.isDefault) ?? state.warehouses[0]
       const receipt: Receipt = {
         id: nid('RCV'),
         poId: action.poId ?? null,
         vendorId: action.vendorId,
         type: action.receiptType ?? 'commercial',
+        warehouseId: warehouse?.id,
+        warehouseCode: warehouse?.code,
+        warehouseName: warehouse?.name,
         createdAt: now(),
         lines: [{
           productId: action.variantId || null,
@@ -317,10 +353,32 @@ function reducer(state: AppState, action: Action): AppState {
           reason: 'po_receipt',
           refId: receipt.id,
           at: now(),
+          warehouseId: warehouse?.id,
+          warehouseCode: warehouse?.code,
+          location: warehouse?.code,
+        }
+        const stockByWarehouse = [...next.stockByWarehouse]
+        if (warehouse) {
+          const idx = stockByWarehouse.findIndex((s) => s.warehouseId === warehouse.id && s.variantId === product.id)
+          if (idx >= 0) {
+            stockByWarehouse[idx] = { ...stockByWarehouse[idx], onHand: stockByWarehouse[idx].onHand + action.qty }
+          } else {
+            stockByWarehouse.push({
+              warehouseId: warehouse.id,
+              warehouseCode: warehouse.code,
+              warehouseName: warehouse.name,
+              isDefault: warehouse.isDefault,
+              variantId: product.id,
+              sku: product.sku,
+              onHand: action.qty,
+              reorderPoint: product.reorderPoint,
+            })
+          }
         }
         return {
           ...next,
           ledger: [entry, ...next.ledger],
+          stockByWarehouse,
           products: next.products.map((p) => (p.id === product.id ? { ...p, stock: p.stock + action.qty } : p)),
         }
       }
@@ -329,6 +387,9 @@ function reducer(state: AppState, action: Action): AppState {
     case 'ADJUST_STOCK': {
       const product = state.products.find((p) => p.id === action.variantId)
       if (!product) return { ...state, toast: 'Product not found.' }
+      const warehouse = action.warehouseId
+        ? state.warehouses.find((w) => w.id === action.warehouseId)
+        : state.warehouses.find((w) => w.isDefault) ?? state.warehouses[0]
       const refId = nid('adj')
       const entry: InventoryLedgerEntry = {
         id: nid('il'),
@@ -337,10 +398,32 @@ function reducer(state: AppState, action: Action): AppState {
         reason: 'manual_adjustment',
         refId,
         at: now(),
+        warehouseId: warehouse?.id,
+        warehouseCode: warehouse?.code,
+        location: warehouse?.code,
+      }
+      const stockByWarehouse = [...state.stockByWarehouse]
+      if (warehouse) {
+        const idx = stockByWarehouse.findIndex((s) => s.warehouseId === warehouse.id && s.variantId === product.id)
+        if (idx >= 0) {
+          stockByWarehouse[idx] = { ...stockByWarehouse[idx], onHand: stockByWarehouse[idx].onHand + action.qtyDelta }
+        } else {
+          stockByWarehouse.push({
+            warehouseId: warehouse.id,
+            warehouseCode: warehouse.code,
+            warehouseName: warehouse.name,
+            isDefault: warehouse.isDefault,
+            variantId: product.id,
+            sku: product.sku,
+            onHand: action.qtyDelta,
+            reorderPoint: product.reorderPoint,
+          })
+        }
       }
       return {
         ...state,
         ledger: [entry, ...state.ledger],
+        stockByWarehouse,
         products: state.products.map((p) =>
           p.id === product.id ? { ...p, stock: p.stock + action.qtyDelta } : p,
         ),
