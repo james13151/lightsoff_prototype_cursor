@@ -73,8 +73,11 @@ type Action =
   | { type: 'SET_TOAST'; message: string | null }
   | { type: 'HYDRATE'; spine: SpineSnapshot }
   | { type: 'ADD_VENDOR'; name: string; leadTimeDays?: number; contactEmail?: string; phone?: string; paymentTerms?: string; notes?: string; isRecurring?: boolean }
+  | { type: 'UPDATE_VENDOR'; vendorId: string; name: string; leadTimeDays?: number; contactEmail?: string; phone?: string; paymentTerms?: string; notes?: string; isRecurring?: boolean }
   | { type: 'CREATE_WAREHOUSE'; code: string; name: string; isDefault?: boolean; contactName?: string; contactEmail?: string; contactPhone?: string; address?: LocationAddress }
+  | { type: 'UPDATE_WAREHOUSE'; warehouseId: string; name: string; isDefault?: boolean; contactName?: string; contactEmail?: string; contactPhone?: string; address?: LocationAddress }
   | { type: 'ADD_PRODUCT'; title: string; sku: string; price?: number; unitCost?: number; reorderPoint?: number }
+  | { type: 'UPDATE_PRODUCT'; productId: string; title: string; description?: string; brand?: string; variants: { id: string; sku: string; price: number; unitCost: number; reorderPoint: number; title?: string }[] }
   | { type: 'CREATE_PO'; vendorId: string; variantId: string; qty: number; unitCost: number; send?: boolean }
   | { type: 'CREATE_RECEIPT'; vendorId: string; poId?: string; variantId: string; qty: number; warehouseId?: string; receiptType?: 'commercial' | 'sample'; description?: string }
   | { type: 'ADJUST_STOCK'; variantId: string; qtyDelta: number; warehouseId?: string; memo?: string }
@@ -270,6 +273,28 @@ function reducer(state: AppState, action: Action): AppState {
         toast: `Vendor "${action.name}" created.`,
       }
     }
+    case 'UPDATE_VENDOR': {
+      const vendors = state.vendors.map((v) =>
+        v.id === action.vendorId
+          ? {
+              ...v,
+              name: action.name,
+              leadTimeDays: action.leadTimeDays ?? v.leadTimeDays,
+              isRecurring: action.isRecurring ?? v.isRecurring,
+              contactEmail: action.contactEmail,
+              phone: action.phone,
+              paymentTerms: action.paymentTerms,
+              notes: action.notes,
+            }
+          : v,
+      )
+      return {
+        ...state,
+        vendors,
+        events: pushEvent(state, 'vendor.updated', 'Inventory', `Vendor "${action.name}" updated`),
+        toast: `Vendor "${action.name}" saved.`,
+      }
+    }
     case 'CREATE_WAREHOUSE': {
       const warehouse: Warehouse = {
         id: nid('wh'),
@@ -291,6 +316,30 @@ function reducer(state: AppState, action: Action): AppState {
         toast: `Warehouse ${action.code} created.`,
       }
     }
+    case 'UPDATE_WAREHOUSE': {
+      const warehouses = (action.isDefault
+        ? state.warehouses.map((w) => ({ ...w, isDefault: w.id === action.warehouseId }))
+        : state.warehouses
+      ).map((w) =>
+        w.id === action.warehouseId
+          ? {
+              ...w,
+              name: action.name,
+              isDefault: action.isDefault ?? w.isDefault,
+              contactName: action.contactName,
+              contactEmail: action.contactEmail,
+              contactPhone: action.contactPhone,
+              address: action.address ?? w.address,
+            }
+          : w,
+      )
+      return {
+        ...state,
+        warehouses,
+        events: pushEvent(state, 'warehouse.updated', 'Inventory', `Location ${action.name} updated`),
+        toast: `Location "${action.name}" saved.`,
+      }
+    }
     case 'ADD_PRODUCT': {
       const product: Product = {
         id: nid('p'),
@@ -308,6 +357,43 @@ function reducer(state: AppState, action: Action): AppState {
         products: [...state.products, product],
         events: pushEvent(state, 'product.created', 'Inventory', `Product ${action.sku} added to master data`),
         toast: `Product ${action.sku} created.`,
+      }
+    }
+    case 'UPDATE_PRODUCT': {
+      const products = state.products.map((p) => {
+        const v = action.variants.find((x) => x.id === p.id)
+        if (!v) return p
+        return {
+          ...p,
+          sku: v.sku,
+          name: v.title ? `${action.title} (${v.title})` : action.title,
+          price: v.price,
+          unitCost: v.unitCost,
+          reorderPoint: v.reorderPoint,
+        }
+      })
+      const productMasters = state.productMasters.length > 0
+        ? state.productMasters.map((pm) =>
+            pm.id === action.productId
+              ? {
+                  ...pm,
+                  title: action.title,
+                  description: action.description,
+                  brand: action.brand,
+                  variants: pm.variants.map((pv) => {
+                    const v = action.variants.find((x) => x.id === pv.id)
+                    return v ? { ...pv, sku: v.sku, price: v.price, unitCost: v.unitCost, reorderPoint: v.reorderPoint, name: v.title ? `${action.title} (${v.title})` : action.title } : pv
+                  }),
+                }
+              : pm,
+          )
+        : state.productMasters
+      return {
+        ...state,
+        products,
+        productMasters,
+        events: pushEvent(state, 'product.updated', 'Inventory', `Product "${action.title}" updated`),
+        toast: `Product "${action.title}" saved.`,
       }
     }
     case 'CREATE_PO': {
@@ -388,6 +474,21 @@ function reducer(state: AppState, action: Action): AppState {
           ledger: [entry, ...next.ledger],
           stockByWarehouse,
           products: next.products.map((p) => (p.id === product.id ? { ...p, stock: p.stock + action.qty } : p)),
+          purchaseOrders: action.poId
+            ? next.purchaseOrders.map((po) =>
+                po.id === action.poId
+                  ? {
+                      ...po,
+                      lines: po.lines.map((l) =>
+                        l.productId === product.id
+                          ? { ...l, receivedQty: (l.receivedQty ?? 0) + action.qty }
+                          : l,
+                      ),
+                      status: po.status === 'sent' ? 'partially_received' as const : po.status,
+                    }
+                  : po,
+              )
+            : next.purchaseOrders,
         }
       }
       return next

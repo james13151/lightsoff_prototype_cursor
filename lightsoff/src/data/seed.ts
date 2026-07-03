@@ -55,19 +55,19 @@ export const products: Product[] = [
 
 export const purchaseOrders: PurchaseOrder[] = [
   {
-    id: 'PO-1042', vendorId: 'v1', status: 'sent', createdAt: daysAgo(6), source: 'ai_capture',
+    id: 'PO-1042', poNumber: 'PO-1042', vendorId: 'v1', status: 'sent', createdAt: daysAgo(6), source: 'ai_capture',
     lines: [
-      { productId: 'p1', qty: 60, unitCost: 18.5 },
-      { productId: 'p2', qty: 40, unitCost: 18.5 },
+      { id: 'pl-1', productId: 'p1', qty: 60, unitCost: 18.5, receivedQty: 0 },
+      { id: 'pl-2', productId: 'p2', qty: 40, unitCost: 18.5, receivedQty: 0 },
     ],
   },
   {
-    id: 'PO-1041', vendorId: 'v2', status: 'received', createdAt: daysAgo(14), source: 'manual',
-    lines: [{ productId: 'p5', qty: 100, unitCost: 5.6 }],
+    id: 'PO-1041', poNumber: 'PO-1041', vendorId: 'v2', status: 'received', createdAt: daysAgo(14), source: 'manual',
+    lines: [{ id: 'pl-3', productId: 'p5', qty: 100, unitCost: 5.6, receivedQty: 97 }],
   },
   {
-    id: 'PO-1040', vendorId: 'v3', status: 'received', createdAt: daysAgo(21), source: 'ai_capture',
-    lines: [{ productId: 'p6', qty: 50, unitCost: 3.9 }],
+    id: 'PO-1040', poNumber: 'PO-1040', vendorId: 'v3', status: 'received', createdAt: daysAgo(21), source: 'ai_capture',
+    lines: [{ id: 'pl-4', productId: 'p6', qty: 50, unitCost: 3.9, receivedQty: 50 }],
   },
 ]
 

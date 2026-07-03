@@ -132,6 +132,64 @@ export function inventoryRoutes(app: FastifyInstance) {
     })
   })
 
+  app.patch<{
+    Params: { id: string }
+    Body: { title?: string; description?: string; brand?: string; product_type?: string; default_vendor_id?: string; custom_attributes?: Record<string, unknown> }
+  }>('/v1/products/:id', async (req, reply) => {
+    const { title, description, brand, product_type, default_vendor_id, custom_attributes } = req.body ?? {}
+    try {
+      const product = await withUser(req.userId, async (db) => {
+        const r = await db.query(
+          `update app.products set
+             title = coalesce($2, title),
+             description = coalesce($3, description),
+             brand = coalesce($4, brand),
+             product_type = coalesce($5, product_type),
+             default_vendor_id = coalesce($6, default_vendor_id),
+             custom_attributes = coalesce($7, custom_attributes),
+             updated_at = now()
+           where id = $1 returning *`,
+          [req.params.id, title ?? null, description ?? null, brand ?? null, product_type ?? null, default_vendor_id ?? null, custom_attributes ? JSON.stringify(custom_attributes) : null],
+        )
+        return r.rows[0]
+      })
+      if (!product) return reply.code(404).send({ error: 'product not found' })
+      return product
+    } catch (err) {
+      if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
+      throw err
+    }
+  })
+
+  app.patch<{
+    Params: { id: string }
+    Body: { sku?: string; title?: string; price?: number; unit_cost?: number; reorder_point?: number; barcode?: string }
+  }>('/v1/variants/:id', async (req, reply) => {
+    const { sku, title, price, unit_cost, reorder_point, barcode } = req.body ?? {}
+    try {
+      const variant = await withUser(req.userId, async (db) => {
+        const r = await db.query(
+          `update app.variants set
+             sku = coalesce($2, sku),
+             title = coalesce($3, title),
+             price = coalesce($4, price),
+             unit_cost = coalesce($5, unit_cost),
+             reorder_point = coalesce($6, reorder_point),
+             barcode = coalesce($7, barcode),
+             updated_at = now()
+           where id = $1 returning *`,
+          [req.params.id, sku ?? null, title ?? null, price ?? null, unit_cost ?? null, reorder_point ?? null, barcode ?? null],
+        )
+        return r.rows[0]
+      })
+      if (!variant) return reply.code(404).send({ error: 'variant not found' })
+      return variant
+    } catch (err) {
+      if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
+      throw err
+    }
+  })
+
   // ---- Purchase orders ----
 
   app.post<{
@@ -255,6 +313,47 @@ export function inventoryRoutes(app: FastifyInstance) {
         return r.rows[0]
       })
       return reply.code(201).send(warehouse)
+    } catch (err) {
+      if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
+      throw err
+    }
+  })
+
+  app.patch<{
+    Params: { id: string }
+    Body: {
+      name?: string
+      is_default?: boolean
+      contact_name?: string
+      contact_email?: string
+      contact_phone?: string
+      address?: Record<string, unknown>
+    }
+  }>('/v1/warehouses/:id', async (req, reply) => {
+    const { name, is_default, contact_name, contact_email, contact_phone, address } = req.body ?? {}
+    try {
+      const warehouse = await withUser(req.userId, async (db) => {
+        if (is_default) {
+          const wh = await db.query(`select tenant_id from app.warehouses where id = $1`, [req.params.id])
+          if (wh.rows[0]) {
+            await db.query(`update app.warehouses set is_default = false where tenant_id = $1`, [wh.rows[0].tenant_id])
+          }
+        }
+        const r = await db.query(
+          `update app.warehouses set
+             name = coalesce($2, name),
+             is_default = coalesce($3, is_default),
+             contact_name = coalesce($4, contact_name),
+             contact_email = coalesce($5, contact_email),
+             contact_phone = coalesce($6, contact_phone),
+             address = coalesce($7, address)
+           where id = $1 returning *`,
+          [req.params.id, name ?? null, is_default ?? null, contact_name ?? null, contact_email ?? null, contact_phone ?? null, address ? JSON.stringify(address) : null],
+        )
+        return r.rows[0]
+      })
+      if (!warehouse) return reply.code(404).send({ error: 'warehouse not found' })
+      return warehouse
     } catch (err) {
       if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
       throw err

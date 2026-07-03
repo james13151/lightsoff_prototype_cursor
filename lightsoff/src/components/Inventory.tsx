@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useStore } from '../store'
 import {
   adjustInventory, createProduct, createPurchaseOrder, createReceipt, createVendor, createWarehouse,
+  updateProduct, updateVariant, updateVendor, updateWarehouse,
 } from '../api/mutations'
 import {
   Badge, Button, Card, Field, FormPanel, Input, SectionTitle, Select, SubTabs, TextArea, timeAgo,
@@ -25,9 +26,13 @@ const INV_TABS: { id: InvTab; label: string }[] = [
   { id: 'warehouses', label: 'Locations' },
 ]
 
+type EditTarget = { kind: 'vendor' | 'product' | 'warehouse'; id: string } | null
+
 export function Inventory() {
   const { state, spineMutate, auth } = useStore()
   const [tab, setTab] = useState<InvTab>('stock')
+  const [editTarget, setEditTarget] = useState<EditTarget>(null)
+  const [editVariants, setEditVariants] = useState<{ id: string; sku: string; price: string; unitCost: string; reorderPoint: string; title?: string }[]>([])
   const vendorName = (id: string) => state.vendors.find((v) => v.id === id)?.name ?? '—'
   const productById = (id: string | null) => state.products.find((p) => p.id === id)
 
@@ -110,6 +115,105 @@ export function Inventory() {
     return parts.join(' · ')
   }
 
+  function resetVendorForm() {
+    setVendorNameInput('')
+    setVendorLead('14')
+    setVendorEmail('')
+    setVendorPhone('')
+    setVendorPaymentTerms('Net 30')
+    setVendorNotes('')
+    setVendorRecurring(true)
+  }
+
+  function resetProductForm() {
+    setProductTitle('')
+    setProductBrand('')
+    setProductDesc('')
+    setProductSku('')
+    setProductPrice('')
+    setProductCost('')
+    setProductReorder('0')
+    setOpt1Values('')
+    setOpt2Values('')
+    setVariantEdits({})
+    setEditVariants([])
+  }
+
+  function resetWarehouseForm() {
+    setWhCode('')
+    setWhName('')
+    setWhDefault(false)
+    setWhContactName('')
+    setWhContactEmail('')
+    setWhContactPhone('')
+    setWhAddrLine1('')
+    setWhAddrLine2('')
+    setWhCity('')
+    setWhState('')
+    setWhPostal('')
+    setWhCountry('')
+  }
+
+  function startEditVendor(vendorId: string) {
+    const v = state.vendors.find((x) => x.id === vendorId)
+    if (!v) return
+    setEditTarget({ kind: 'vendor', id: vendorId })
+    setVendorNameInput(v.name)
+    setVendorLead(String(v.leadTimeDays))
+    setVendorEmail(v.contactEmail ?? '')
+    setVendorPhone(v.phone ?? '')
+    setVendorPaymentTerms(v.paymentTerms ?? '')
+    setVendorNotes(v.notes ?? '')
+    setVendorRecurring(v.isRecurring)
+    setTab('master')
+  }
+
+  function startEditProduct(productId: string) {
+    const pm = state.productMasters.find((p) => p.id === productId)
+    const single = state.products.find((p) => p.id === productId)
+    const master = pm ?? (single ? { id: single.id, title: single.name, description: undefined, brand: undefined, options: [], variants: [single] } : null)
+    if (!master) return
+    setEditTarget({ kind: 'product', id: productId })
+    setProductTitle(master.title)
+    setProductBrand(master.brand ?? '')
+    setProductDesc(master.description ?? '')
+    setEditVariants(master.variants.map((v) => ({
+      id: v.id,
+      sku: v.sku,
+      price: String(v.price),
+      unitCost: String(v.unitCost),
+      reorderPoint: String(v.reorderPoint),
+      title: v.optionValues ? Object.values(v.optionValues).join(' / ') : undefined,
+    })))
+    setTab('master')
+  }
+
+  function startEditWarehouse(warehouseId: string) {
+    const w = state.warehouses.find((x) => x.id === warehouseId)
+    if (!w) return
+    setEditTarget({ kind: 'warehouse', id: warehouseId })
+    setWhCode(w.code)
+    setWhName(w.name)
+    setWhDefault(w.isDefault)
+    setWhContactName(w.contactName ?? '')
+    setWhContactEmail(w.contactEmail ?? '')
+    setWhContactPhone(w.contactPhone ?? '')
+    setWhAddrLine1(w.address?.line1 ?? '')
+    setWhAddrLine2(w.address?.line2 ?? '')
+    setWhCity(w.address?.city ?? '')
+    setWhState(w.address?.state ?? '')
+    setWhPostal(w.address?.postalCode ?? '')
+    setWhCountry(w.address?.country ?? '')
+    setTab('warehouses')
+  }
+
+  function cancelEdit() {
+    setEditTarget(null)
+    resetVendorForm()
+    resetProductForm()
+    resetWarehouseForm()
+  }
+
   const stockRows = stockWarehouseFilter
     ? state.stockByWarehouse.filter((s) => s.warehouseId === stockWarehouseFilter && s.onHand !== 0)
     : state.stockByWarehouse.filter((s) => s.onHand !== 0)
@@ -127,19 +231,24 @@ export function Inventory() {
       notes: vendorNotes.trim() || undefined,
       isRecurring: vendorRecurring,
     }
+    if (editTarget?.kind === 'vendor') {
+      await spineMutate(
+        () => updateVendor(auth!.token, editTarget.id, payload),
+        { type: 'UPDATE_VENDOR', vendorId: editTarget.id, ...payload },
+      )
+      cancelEdit()
+      return
+    }
     await spineMutate(
       () => createVendor(auth!.token, auth!.tenantId, payload),
       { type: 'ADD_VENDOR', ...payload },
     )
-    setVendorNameInput('')
-    setVendorEmail('')
-    setVendorPhone('')
-    setVendorNotes('')
+    resetVendorForm()
   }
 
   async function onAddWarehouse(e: FormEvent) {
     e.preventDefault()
-    if (!whCode.trim() || !whName.trim()) return
+    if (!whName.trim()) return
     const address: LocationAddress = {
       line1: whAddrLine1.trim() || undefined,
       line2: whAddrLine2.trim() || undefined,
@@ -149,7 +258,6 @@ export function Inventory() {
       country: whCountry.trim() || undefined,
     }
     const payload = {
-      code: whCode.trim(),
       name: whName.trim(),
       isDefault: whDefault,
       contactName: whContactName.trim() || undefined,
@@ -157,27 +265,67 @@ export function Inventory() {
       contactPhone: whContactPhone.trim() || undefined,
       address: Object.values(address).some(Boolean) ? address : undefined,
     }
+    if (editTarget?.kind === 'warehouse') {
+      await spineMutate(
+        () => updateWarehouse(auth!.token, editTarget.id, payload),
+        { type: 'UPDATE_WAREHOUSE', warehouseId: editTarget.id, ...payload },
+      )
+      cancelEdit()
+      return
+    }
+    if (!whCode.trim()) return
     await spineMutate(
-      () => createWarehouse(auth!.token, auth!.tenantId, payload),
-      { type: 'CREATE_WAREHOUSE', ...payload },
+      () => createWarehouse(auth!.token, auth!.tenantId, { code: whCode.trim(), ...payload }),
+      { type: 'CREATE_WAREHOUSE', code: whCode.trim(), ...payload },
     )
-    setWhCode('')
-    setWhName('')
-    setWhDefault(false)
-    setWhContactName('')
-    setWhContactEmail('')
-    setWhContactPhone('')
-    setWhAddrLine1('')
-    setWhAddrLine2('')
-    setWhCity('')
-    setWhState('')
-    setWhPostal('')
-    setWhCountry('')
+    resetWarehouseForm()
   }
 
   async function onAddProduct(e: FormEvent) {
     e.preventDefault()
-    if (!productTitle.trim() || !productSku.trim()) return
+    if (!productTitle.trim()) return
+
+    if (editTarget?.kind === 'product') {
+      const variants = editVariants.map((v) => ({
+        id: v.id,
+        sku: v.sku.trim(),
+        title: v.title,
+        price: Number(v.price) || 0,
+        unitCost: Number(v.unitCost) || 0,
+        reorderPoint: Number(v.reorderPoint) || 0,
+      }))
+      if (variants.some((v) => !v.sku)) return
+      const demoPayload = {
+        productId: editTarget.id,
+        title: productTitle.trim(),
+        description: productDesc.trim() || undefined,
+        brand: productBrand.trim() || undefined,
+        variants,
+      }
+      await spineMutate(
+        async () => {
+          await updateProduct(auth!.token, editTarget.id, {
+            title: demoPayload.title,
+            description: demoPayload.description,
+            brand: demoPayload.brand,
+          })
+          for (const v of variants) {
+            await updateVariant(auth!.token, v.id, {
+              sku: v.sku,
+              title: v.title,
+              price: v.price,
+              unitCost: v.unitCost,
+              reorderPoint: v.reorderPoint,
+            })
+          }
+        },
+        { type: 'UPDATE_PRODUCT', ...demoPayload },
+      )
+      cancelEdit()
+      return
+    }
+
+    if (!productSku.trim()) return
     const reorderPoint = Number(productReorder) || 0
     const variants = variantRows.map((row) => ({
       sku: row.sku.trim(),
@@ -199,15 +347,7 @@ export function Inventory() {
       }),
       { type: 'ADD_PRODUCT', title: productTitle.trim(), sku: variants[0].sku, price: variants[0].price, unitCost: variants[0].unitCost, reorderPoint },
     )
-    setProductTitle('')
-    setProductBrand('')
-    setProductDesc('')
-    setProductSku('')
-    setProductPrice('')
-    setProductCost('')
-    setOpt1Values('')
-    setOpt2Values('')
-    setVariantEdits({})
+    resetProductForm()
   }
 
   async function onCreatePo(e: FormEvent) {
@@ -372,8 +512,69 @@ export function Inventory() {
 
       {tab === 'master' && (
         <div className="grid gap-3 lg:grid-cols-2">
+          {editTarget?.kind === 'product' ? (
+            <form onSubmit={onAddProduct} className="lg:col-span-2">
+              <FormPanel title="Edit product">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">Editing master record</span>
+                  <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Product title">
+                    <Input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} required />
+                  </Field>
+                  <Field label="Brand">
+                    <Input value={productBrand} onChange={(e) => setProductBrand(e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Description">
+                  <TextArea value={productDesc} onChange={(e) => setProductDesc(e.target.value)} />
+                </Field>
+                <div className="rounded-lg border border-slate-100">
+                  <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">Variants</div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                        <th className="px-3 py-2 font-medium">Variant</th>
+                        <th className="px-3 py-2 font-medium">SKU</th>
+                        <th className="px-3 py-2 font-medium text-right">Price</th>
+                        <th className="px-3 py-2 font-medium text-right">Unit cost</th>
+                        <th className="px-3 py-2 font-medium text-right">Reorder pt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editVariants.map((row, i) => (
+                        <tr key={row.id} className="border-b border-slate-50 last:border-0">
+                          <td className="px-3 py-2 text-slate-600">{row.title ?? '—'}</td>
+                          <td className="px-3 py-2">
+                            <Input value={row.sku} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, sku: e.target.value } : r))} className="font-mono text-xs" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" step="0.01" value={row.price} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, price: e.target.value } : r))} className="text-right" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" step="0.01" value={row.unitCost} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, unitCost: e.target.value } : r))} className="text-right" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" value={row.reorderPoint} onChange={(e) => setEditVariants((rows) => rows.map((r, j) => j === i ? { ...r, reorderPoint: e.target.value } : r))} className="text-right" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Button type="submit" className="w-full">Save product</Button>
+              </FormPanel>
+            </form>
+          ) : (
+            <>
           <form onSubmit={onAddVendor}>
-            <FormPanel title="Add vendor">
+            <FormPanel title={editTarget?.kind === 'vendor' ? 'Edit vendor' : 'Add vendor'}>
+              {editTarget?.kind === 'vendor' && (
+                <div className="mb-2 flex justify-end">
+                  <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
+                </div>
+              )}
               <Field label="Name">
                 <Input value={vendorNameInput} onChange={(e) => setVendorNameInput(e.target.value)} placeholder="Acme Textiles" required />
               </Field>
@@ -400,10 +601,11 @@ export function Inventory() {
                 <input type="checkbox" checked={vendorRecurring} onChange={(e) => setVendorRecurring(e.target.checked)} />
                 Recurring vendor (auto-post bills)
               </label>
-              <Button type="submit" className="w-full">Create vendor</Button>
+              <Button type="submit" className="w-full">{editTarget?.kind === 'vendor' ? 'Save vendor' : 'Create vendor'}</Button>
             </FormPanel>
           </form>
 
+          {!editTarget && (
           <form onSubmit={onAddProduct} className="lg:col-span-2">
             <FormPanel title="Add product (master + variant matrix)">
               <div className="grid grid-cols-2 gap-2">
@@ -502,7 +704,11 @@ export function Inventory() {
               <Button type="submit" className="w-full">Create product</Button>
             </FormPanel>
           </form>
+          )}
+            </>
+          )}
 
+          {!editTarget && (
           <Card className="lg:col-span-2 p-4">
             <div className="mb-3 text-sm font-medium text-slate-700">Vendors ({state.vendors.length})</div>
             <div className="space-y-2">
@@ -513,6 +719,7 @@ export function Inventory() {
                     <Badge tone="slate">{v.leadTimeDays}d lead</Badge>
                     {v.paymentTerms && <Badge tone="sky">{v.paymentTerms}</Badge>}
                     {!v.isRecurring && <Badge tone="amber">new vendor</Badge>}
+                    <Button type="button" variant="ghost" className="ml-auto" onClick={() => startEditVendor(v.id)}>Edit</Button>
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
                     {[v.contactEmail, v.phone].filter(Boolean).join(' · ')}
@@ -522,22 +729,28 @@ export function Inventory() {
               ))}
             </div>
           </Card>
+          )}
 
-          {(state.productMasters.length > 0 || state.products.length > 0) && (
+          {!editTarget && (state.productMasters.length > 0 || state.products.length > 0) && (
             <Card className="lg:col-span-2 p-4">
               <div className="mb-3 text-sm font-medium text-slate-700">Products</div>
               <div className="space-y-3">
-                {(state.productMasters.length > 0 ? state.productMasters : [{ id: 'demo', title: 'Products', variants: state.products, options: [] }]).map((pm) => (
+                {(state.productMasters.length > 0 ? state.productMasters : state.products.map((p) => ({ id: p.id, title: p.name, description: undefined, variants: [p], options: [] }))).map((pm) => (
                   <div key={pm.id} className="rounded-lg border border-slate-100 px-3 py-2">
-                    <div className="font-medium">{pm.title}</div>
-                    {pm.description && <p className="mt-0.5 text-xs text-slate-500">{pm.description}</p>}
-                    <div className="mt-2 space-y-1">
-                      {pm.variants.map((v) => (
-                        <div key={v.id} className="flex justify-between text-xs text-slate-600">
-                          <span className="font-mono">{v.sku}</span>
-                          <span>${v.price.toFixed(2)} · cost ${v.unitCost.toFixed(2)}</span>
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <div className="font-medium">{pm.title}</div>
+                        {pm.description && <p className="mt-0.5 text-xs text-slate-500">{pm.description}</p>}
+                        <div className="mt-2 space-y-1">
+                          {pm.variants.map((v) => (
+                            <div key={v.id} className="flex justify-between text-xs text-slate-600">
+                              <span className="font-mono">{v.sku}</span>
+                              <span>${v.price.toFixed(2)} · cost ${v.unitCost.toFixed(2)}</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                      <Button type="button" variant="ghost" onClick={() => startEditProduct(pm.id)}>Edit</Button>
                     </div>
                   </div>
                 ))}
@@ -603,25 +816,42 @@ export function Inventory() {
                   </Badge>
                   <span className="ml-auto text-xs text-slate-400">{vendorName(po.vendorId)} · {timeAgo(po.createdAt)}</span>
                 </div>
-                <div className="mt-2 text-sm text-slate-600">
-                  {po.lines.map((l) => {
-                    const p = productById(l.productId)
-                    return (
-                      <div key={l.id ?? l.productId} className="flex justify-between border-t border-slate-50 py-1 first:border-0">
-                        <span>
-                          {l.qty}× {p?.name ?? l.productId.slice(0, 8)}
-                          {l.receivedQty != null && <span className="text-slate-400"> · received {l.receivedQty}/{l.qty}</span>}
-                        </span>
-                        <span className="text-slate-400">${(l.lineTotal ?? l.qty * l.unitCost).toFixed(2)}</span>
-                      </div>
-                    )
-                  })}
-                  {po.linkedBills && po.linkedBills.length > 0 && (
-                    <div className="mt-2 text-xs text-slate-500">
-                      Linked bills: {po.linkedBills.map((b) => b.billNumber ?? b.id.slice(0, 8)).join(', ')}
-                    </div>
-                  )}
+                <div className="mt-2">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                        <th className="py-1.5 font-medium">SKU / product</th>
+                        <th className="py-1.5 font-medium text-right">Ordered</th>
+                        <th className="py-1.5 font-medium text-right">Received</th>
+                        <th className="py-1.5 font-medium text-right">Outstanding</th>
+                        <th className="py-1.5 font-medium text-right">Line total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {po.lines.map((l) => {
+                        const p = productById(l.productId)
+                        const received = l.receivedQty ?? 0
+                        const outstanding = Math.max(0, l.qty - received)
+                        return (
+                          <tr key={l.id ?? l.productId} className="border-b border-slate-50 last:border-0">
+                            <td className="py-1.5 text-slate-600">{p?.sku ?? l.productId.slice(0, 8)} — {p?.name ?? '—'}</td>
+                            <td className="py-1.5 text-right">{l.qty}</td>
+                            <td className={`py-1.5 text-right font-medium ${received < l.qty ? 'text-amber-600' : received > l.qty ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {received}
+                            </td>
+                            <td className="py-1.5 text-right text-slate-500">{outstanding}</td>
+                            <td className="py-1.5 text-right text-slate-400">${(l.lineTotal ?? l.qty * l.unitCost).toFixed(2)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
+                {po.linkedBills && po.linkedBills.length > 0 && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    Linked bills: {po.linkedBills.map((b) => b.billNumber ?? b.id.slice(0, 8)).join(', ')}
+                  </div>
+                )}
               </Card>
             ))}
           </div>
@@ -759,10 +989,15 @@ export function Inventory() {
       {tab === 'warehouses' && (
         <div className="space-y-4">
           <form onSubmit={onAddWarehouse} className="max-w-2xl">
-            <FormPanel title="Add warehouse / location">
+            <FormPanel title={editTarget?.kind === 'warehouse' ? 'Edit location' : 'Add warehouse / location'}>
+              {editTarget?.kind === 'warehouse' && (
+                <div className="mb-2 flex justify-end">
+                  <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Code">
-                  <Input value={whCode} onChange={(e) => setWhCode(e.target.value)} placeholder="3PL-WEST" required />
+                  <Input value={whCode} onChange={(e) => setWhCode(e.target.value)} placeholder="3PL-WEST" required disabled={editTarget?.kind === 'warehouse'} />
                 </Field>
                 <Field label="Name">
                   <Input value={whName} onChange={(e) => setWhName(e.target.value)} placeholder="West coast 3PL" required />
@@ -806,10 +1041,11 @@ export function Inventory() {
                 <input type="checkbox" checked={whDefault} onChange={(e) => setWhDefault(e.target.checked)} />
                 Set as default receiving location
               </label>
-              <Button type="submit" className="w-full">Create location</Button>
+              <Button type="submit" className="w-full">{editTarget?.kind === 'warehouse' ? 'Save location' : 'Create location'}</Button>
             </FormPanel>
           </form>
 
+          {!editTarget && (
           <div className="space-y-2.5">
             {state.warehouses.length === 0 ? (
               <Card className="p-4 text-sm text-slate-400">No locations yet — a default MAIN warehouse is created per tenant in live mode.</Card>
@@ -819,6 +1055,7 @@ export function Inventory() {
                   <span className="font-mono text-sm font-semibold">{w.code}</span>
                   <span className="text-sm text-slate-600">{w.name}</span>
                   {w.isDefault && <Badge tone="emerald">default</Badge>}
+                  <Button type="button" variant="ghost" className="ml-auto" onClick={() => startEditWarehouse(w.id)}>Edit</Button>
                 </div>
                 {(w.contactName || w.contactEmail || w.contactPhone) && (
                   <div className="mt-1 text-xs text-slate-500">
@@ -834,6 +1071,7 @@ export function Inventory() {
               </Card>
             ))}
           </div>
+          )}
         </div>
       )}
     </div>

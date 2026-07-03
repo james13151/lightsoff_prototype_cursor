@@ -8,6 +8,9 @@ type Row = Record<string, any>
 const post = (token: string, path: string, body: unknown) =>
   apiFetch<Row>(path, { method: 'POST', token, body: JSON.stringify(body) })
 
+const patch = (token: string, path: string, body: unknown) =>
+  apiFetch<Row>(path, { method: 'PATCH', token, body: JSON.stringify(body) })
+
 export interface AccountOption {
   id: string
   code: string
@@ -47,6 +50,95 @@ export async function createVendor(
     payment_terms: data.paymentTerms,
     notes: data.notes,
     is_recurring: data.isRecurring,
+  })
+}
+
+export async function updateVendor(
+  token: string,
+  vendorId: string,
+  data: {
+    name?: string
+    leadTimeDays?: number
+    contactEmail?: string
+    phone?: string
+    paymentTerms?: string
+    notes?: string
+    isRecurring?: boolean
+  },
+) {
+  return patch(token, `/v1/vendors/${vendorId}`, {
+    name: data.name,
+    lead_time_days: data.leadTimeDays,
+    contact_email: data.contactEmail,
+    phone: data.phone,
+    payment_terms: data.paymentTerms,
+    notes: data.notes,
+    is_recurring: data.isRecurring,
+  })
+}
+
+export async function updateProduct(
+  token: string,
+  productId: string,
+  data: { title?: string; description?: string; brand?: string; productType?: string; defaultVendorId?: string },
+) {
+  return patch(token, `/v1/products/${productId}`, {
+    title: data.title,
+    description: data.description,
+    brand: data.brand,
+    product_type: data.productType,
+    default_vendor_id: data.defaultVendorId,
+  })
+}
+
+export async function updateVariant(
+  token: string,
+  variantId: string,
+  data: { sku?: string; title?: string; price?: number; unitCost?: number; reorderPoint?: number; barcode?: string },
+) {
+  return patch(token, `/v1/variants/${variantId}`, {
+    sku: data.sku,
+    title: data.title,
+    price: data.price,
+    unit_cost: data.unitCost,
+    reorder_point: data.reorderPoint,
+    barcode: data.barcode,
+  })
+}
+
+export async function updateWarehouse(
+  token: string,
+  warehouseId: string,
+  data: {
+    name?: string
+    isDefault?: boolean
+    contactName?: string
+    contactEmail?: string
+    contactPhone?: string
+    address?: {
+      line1?: string
+      line2?: string
+      city?: string
+      state?: string
+      postalCode?: string
+      country?: string
+    }
+  },
+) {
+  return patch(token, `/v1/warehouses/${warehouseId}`, {
+    name: data.name,
+    is_default: data.isDefault,
+    contact_name: data.contactName,
+    contact_email: data.contactEmail,
+    contact_phone: data.contactPhone,
+    address: data.address ? {
+      line1: data.address.line1,
+      line2: data.address.line2,
+      city: data.address.city,
+      state: data.address.state,
+      postal_code: data.address.postalCode,
+      country: data.address.country,
+    } : undefined,
   })
 }
 
