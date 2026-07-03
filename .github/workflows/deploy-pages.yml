@@ -13,13 +13,17 @@ permissions:
   pages: write
   id-token: write
 
+# Do not cancel in-progress deploys — cancelling mid-flight can wedge Pages for ~10–60 min.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -49,20 +53,32 @@ jobs:
           touch dist/.nojekyll
         working-directory: lightsoff
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-        # Fails until Settings → Pages → Source is set to "GitHub Actions" (one-time).
+      - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
         with:
           path: lightsoff/dist
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
+      # Pages deploy API is intermittently flaky; retry before failing the workflow.
+      - name: Deploy to GitHub Pages (attempt 1)
+        id: deployment
         uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages (attempt 2)
+        id: deployment2
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages (attempt 3)
+        id: deployment3
+        if: steps.deployment2.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      - name: Verify deployment succeeded
+        if: steps.deployment.outcome != 'success' && steps.deployment2.outcome != 'success' && steps.deployment3.outcome != 'success'
+        run: |
+          echo "::error::GitHub Pages deploy failed after 3 attempts. Re-run the workflow from Actions → Deploy to GitHub Pages → Run workflow."
+          exit 1

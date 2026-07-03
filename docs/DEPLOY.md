@@ -133,6 +133,7 @@ To test Supabase auth locally, copy production `VITE_SUPABASE_*` values into `li
 | Symptom | Fix |
 |---------|-----|
 | Pages 404 | Settings → Pages → Source = GitHub Actions; repo public; re-run workflow |
+| Actions build OK but **deploy failed, try again later** | Known intermittent GitHub Pages issue — re-run the workflow (Actions → Deploy to GitHub Pages → Re-run). The workflow retries deploy up to 3 times automatically. |
 | Connect → CORS error | API must allow your Pages origin (`api/src/server.ts` uses `origin: true` for prototype) |
 | 401 on API calls | `JWT_SECRET` on API must match Supabase JWT secret |
 | 403 / empty data | User not a workspace member; create tenant after sign-in |
