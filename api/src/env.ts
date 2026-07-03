@@ -11,4 +11,9 @@ export const env = {
   encryptionKey: required('APP_ENCRYPTION_KEY'),
   // When true, exposes POST /dev/token for browser dev login (never enable in production).
   allowDevAuth: process.env.ALLOW_DEV_AUTH === 'true',
+  // Shopify custom app credentials (optional — manual token connect still works).
+  shopifyApiKey: process.env.SHOPIFY_API_KEY ?? '',
+  shopifyApiSecret: process.env.SHOPIFY_API_SECRET ?? '',
+  // Public API base URL for webhook registration, e.g. https://lightsoff-api.onrender.com
+  apiPublicUrl: process.env.API_PUBLIC_URL ?? '',
 }
