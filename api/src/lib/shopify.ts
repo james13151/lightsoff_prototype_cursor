@@ -115,6 +115,43 @@ export async function fetchShopifyProducts(cred: ShopifyCredential, limit = 50) 
   return data.products ?? []
 }
 
+export interface ShopifyLocation {
+  id: number
+  name: string
+  active: boolean
+  primary?: boolean
+}
+
+export async function fetchShopifyLocations(cred: ShopifyCredential): Promise<ShopifyLocation[]> {
+  const data = await shopifyFetch<{ locations: ShopifyLocation[] }>(cred, '/locations.json')
+  return data.locations ?? []
+}
+
+export async function getPrimaryShopifyLocationId(cred: ShopifyCredential): Promise<number> {
+  const locations = await fetchShopifyLocations(cred)
+  const primary = locations.find((l) => l.primary) ?? locations.find((l) => l.active)
+  if (!primary) throw new Error('No active Shopify location found')
+  return primary.id
+}
+
+/** Push a relative inventory change to Shopify (LightsOff is stock SoR). */
+export async function adjustShopifyInventory(
+  cred: ShopifyCredential,
+  inventoryItemId: number,
+  locationId: number,
+  availableAdjustment: number,
+) {
+  if (availableAdjustment === 0) return
+  await shopifyFetch(cred, '/inventory_levels/adjust.json', {
+    method: 'POST',
+    body: JSON.stringify({
+      location_id: locationId,
+      inventory_item_id: inventoryItemId,
+      available_adjustment: availableAdjustment,
+    }),
+  })
+}
+
 export async function registerShopifyWebhooks(cred: ShopifyCredential, callbackUrl: string) {
   const topics = ['orders/create', 'orders/updated', 'orders/paid', 'orders/cancelled']
   const results: { topic: string; id?: number; error?: string }[] = []

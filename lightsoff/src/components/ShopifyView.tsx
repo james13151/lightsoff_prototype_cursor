@@ -5,6 +5,7 @@ import {
   connectShopify,
   fetchSalesOrders,
   fetchShopifyStatus,
+  getShopifyOAuthInstallUrl,
   registerShopifyWebhooks,
   shipFulfillment,
   syncShopifyOrders,
@@ -53,6 +54,25 @@ export function ShopifyView() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const shopifyResult = params.get('shopify')
+    if (shopifyResult === 'connected') {
+      dispatch({ type: 'SET_TOAST', message: `Shopify connected (${params.get('shop') ?? 'store'})` })
+      params.delete('shopify')
+      params.delete('shop')
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+      window.history.replaceState({}, '', next)
+      void refresh()
+    } else if (shopifyResult === 'error') {
+      setError(params.get('message') ?? 'Shopify install failed')
+      params.delete('shopify')
+      params.delete('message')
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+      window.history.replaceState({}, '', next)
+    }
+  }, [dispatch, refresh])
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true)
@@ -112,7 +132,7 @@ export function ShopifyView() {
                     )}
                   </p>
                 ) : (
-                  <p className="mt-1 text-sm text-ink-muted">Not connected — add a custom app access token below.</p>
+                  <p className="mt-1 text-sm text-ink-muted">Not connected — install the app or paste a custom app token.</p>
                 )}
               </div>
               {status?.connected && <Badge tone="emerald">Connected</Badge>}
@@ -127,47 +147,72 @@ export function ShopifyView() {
                     placeholder="your-brand.myshopify.com"
                   />
                 </Field>
-                <Field label="Admin API access token">
-                  <Input
-                    type="password"
-                    value={accessToken}
-                    onChange={(e) => setAccessToken(e.target.value)}
-                    placeholder="shpat_…"
-                  />
-                </Field>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    disabled={busy || !shop.trim() || !accessToken.trim()}
-                    onClick={() => void run(async () => {
-                      await connectShopify(auth.token, auth.tenantId, { shop, access_token: accessToken })
-                      setAccessToken('')
-                    })}
-                  >
-                    Save connection
-                  </Button>
-                  {status?.connected && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() => void run(async () => { await registerShopifyWebhooks(auth.token, auth.tenantId) })}
-                      >
-                        Register webhooks
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() => void run(async () => { await syncShopifyProducts(auth.token, auth.tenantId) })}
-                      >
-                        Sync products
-                      </Button>
-                    </>
-                  )}
-                </div>
+
+                {status?.oauth_available && (
+                  <div className="rounded-lg border border-accent/30 bg-accent-soft px-3 py-3">
+                    <p className="text-sm font-medium text-ink">Recommended: OAuth install</p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      One-click install — no manual token copy. Registers webhooks and maps Shopify locations automatically.
+                    </p>
+                    <Button
+                      className="mt-2"
+                      disabled={busy || !shop.trim()}
+                      onClick={() => void run(async () => {
+                        const { install_url } = await getShopifyOAuthInstallUrl(auth.token, auth.tenantId, shop)
+                        window.location.href = install_url
+                      })}
+                    >
+                      Install Shopify app
+                    </Button>
+                  </div>
+                )}
+
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-ink-muted">Or connect with a custom app access token</summary>
+                  <div className="mt-3 space-y-3">
+                    <Field label="Admin API access token">
+                      <Input
+                        type="password"
+                        value={accessToken}
+                        onChange={(e) => setAccessToken(e.target.value)}
+                        placeholder="shpat_…"
+                      />
+                    </Field>
+                    <Button
+                      disabled={busy || !shop.trim() || !accessToken.trim()}
+                      onClick={() => void run(async () => {
+                        await connectShopify(auth.token, auth.tenantId, { shop, access_token: accessToken })
+                        setAccessToken('')
+                      })}
+                    >
+                      Save connection
+                    </Button>
+                  </div>
+                </details>
+
+                {status?.connected && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void run(async () => { await registerShopifyWebhooks(auth.token, auth.tenantId) })}
+                    >
+                      Register webhooks
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void run(async () => { await syncShopifyProducts(auth.token, auth.tenantId) })}
+                    >
+                      Sync products
+                    </Button>
+                  </div>
+                )}
+
                 <p className="text-xs text-ink-faint">
-                  Create a custom app in Shopify Admin → Settings → Apps → Develop apps.
-                  Scopes needed: <code>read_orders</code>, <code>write_orders</code>, <code>read_products</code>, <code>read_inventory</code>.
-                  Set <code>API_PUBLIC_URL</code> on the API host, then click Register webhooks.
+                  OAuth requires <code>SHOPIFY_API_KEY</code>, <code>SHOPIFY_API_SECRET</code>, and <code>API_PUBLIC_URL</code> on the API host.
+                  Manual token: scopes <code>read_orders</code>, <code>write_orders</code>, <code>read_products</code>, <code>read_inventory</code>, <code>write_inventory</code>, <code>read_locations</code>.
+                  Receipts and stock adjustments push inventory to Shopify when variants are linked.
                 </p>
               </div>
             ) : (

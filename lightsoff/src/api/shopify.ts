@@ -8,6 +8,7 @@ const post = (token: string, path: string, body: unknown) =>
 
 export interface ShopifyStatus {
   connected: boolean
+  oauth_available?: boolean
   credential_id?: string
   label?: string
   shop?: string | null
@@ -56,6 +57,11 @@ export async function connectShopify(
   data: { shop: string; access_token: string; label?: string },
 ) {
   return post(token, '/v1/shopify/connect', { tenant_id: tenantId, ...data })
+}
+
+export async function getShopifyOAuthInstallUrl(token: string, tenantId: string, shop: string) {
+  const qs = new URLSearchParams({ tenant_id: tenantId, shop })
+  return apiFetch<{ install_url: string; shop: string }>(`/v1/shopify/oauth/install-url?${qs}`, { token })
 }
 
 export async function registerShopifyWebhooks(token: string, tenantId: string) {

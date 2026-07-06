@@ -64,6 +64,7 @@ function eventSummary(type: string, payload: Record<string, unknown>): string {
   if (type === 'shopify.products.synced') return `Synced ${payload.count} Shopify products`
   if (type === 'fulfillment.shipped') return `Fulfillment shipped — ${payload.tracking_number ?? 'no tracking'}`
   if (type === 'shopify.fulfillment.synced') return `Fulfillment synced to Shopify`
+  if (type === 'shopify.inventory.pushed') return `Shopify inventory ${Number(payload.qty_delta) > 0 ? '+' : ''}${payload.qty_delta}`
   return type
 }
 

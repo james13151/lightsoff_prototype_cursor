@@ -130,14 +130,19 @@ To test Supabase auth locally, copy production `VITE_SUPABASE_*` values into `li
 
 ## 4. Shopify integration
 
-1. Apply migration `20260703070000_shopify_integration.sql` in Supabase SQL editor (after earlier migrations).
-2. On the API host, set:
-   - `API_PUBLIC_URL` — public base URL (e.g. `https://lightsoff-api.onrender.com`)
-   - `SHOPIFY_API_SECRET` — custom app client secret (for webhook HMAC verification)
-3. In the app: **Shopify** → connect store with Admin API access token (`read_orders`, `write_orders`, `read_products`).
-4. Click **Register webhooks** then **Sync products** (maps variants by `shopify_variant_id`).
-5. **Pull orders** or wait for `orders/create` webhooks — paid orders reserve stock in the inventory ledger.
-6. **Mark shipped & sync to Shopify** pushes fulfillment + tracking back via the Fulfillment API.
+1. Apply migrations `20260703070000_shopify_integration.sql` and `20260706080000_shopify_oauth_inventory.sql` in Supabase SQL editor.
+2. Create a **Shopify custom app** (Dev Dashboard) with redirect URL:
+   `https://<your-api-host>/v1/shopify/oauth/callback`
+3. On the API host, set:
+   - `SHOPIFY_API_KEY` — app client ID
+   - `SHOPIFY_API_SECRET` — app client secret (webhook HMAC + OAuth)
+   - `API_PUBLIC_URL` — public API base (e.g. `https://lightsoff-api.onrender.com`)
+   - `FRONTEND_URL` — GitHub Pages URL for post-install redirect
+4. In the app: **Shopify** → enter shop domain → **Install Shopify app** (OAuth), or paste a custom app token.
+5. **Sync products** — maps variants + `shopify_inventory_item_id`.
+6. **Pull orders** or wait for webhooks — paid orders reserve stock in LightsOff.
+7. **Receipts / adjustments** — stock changes push to Shopify via `inventory_levels/adjust`.
+8. **Mark shipped** — fulfillment + tracking syncs back to Shopify.
 
 ---
 

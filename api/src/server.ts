@@ -5,7 +5,7 @@ import { withUser } from './db.js'
 import { inventoryRoutes } from './routes/inventory.js'
 import { financeRoutes } from './routes/finance.js'
 import { memberRoutes } from './routes/members.js'
-import { shopifyRoutes, handleShopifyWebhook } from './routes/shopify.js'
+import { shopifyRoutes, handleShopifyWebhook, handleShopifyOAuthCallback } from './routes/shopify.js'
 import { registerDevAuth } from './devAuth.js'
 import { env } from './env.js'
 
@@ -38,6 +38,14 @@ export function buildServer() {
     const result = await handleShopifyWebhook(req, rawBody)
     return reply.code(result.status).send(result.body)
   })
+
+  app.get<{ Querystring: { code?: string; shop?: string; state?: string; error?: string; error_description?: string } }>(
+    '/v1/shopify/oauth/callback',
+    async (req, reply) => {
+      const result = await handleShopifyOAuthCallback(req.query)
+      return reply.redirect(result.redirect)
+    },
+  )
 
   registerDevAuth(app)
 

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { withUser } from '../db.js'
+import { pushInventoryDeltaToShopify, pushReceiptInventoryToShopify } from '../lib/shopifyInventory.js'
 
 interface POLineInput {
   variant_id?: string
@@ -393,9 +394,10 @@ export function inventoryRoutes(app: FastifyInstance) {
               and payload->>'receipt_id' = $2::text`,
           [tenant_id, receipt.id],
         )
-        return { ...receipt, discrepancies: discrepancies.rows.map((x) => x.payload) }
+        return { id: receipt.id as string, ...receipt, discrepancies: discrepancies.rows.map((x) => x.payload) }
       })
-      return reply.code(201).send(result)
+      const shopifyPush = await pushReceiptInventoryToShopify(req.userId, tenant_id, result.id)
+      return reply.code(201).send({ ...result, shopify_inventory_push: shopifyPush })
     } catch (err) {
       if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
       throw err
@@ -509,7 +511,17 @@ export function inventoryRoutes(app: FastifyInstance) {
         ])
         return created
       })
-      return reply.code(201).send(entry)
+      const shopifyPush = await pushInventoryDeltaToShopify({
+        userId: req.userId,
+        tenantId: tenant_id,
+        variantId: variant_id,
+        qtyDelta: qty_delta,
+        reason: 'manual_adjustment',
+        refType: 'adjustment',
+        refId: entry.id,
+        warehouseId: warehouse_id ?? null,
+      })
+      return reply.code(201).send({ ...entry, shopify_inventory_push: shopifyPush })
     } catch (err) {
       if (isRlsViolation(err)) return reply.code(403).send({ error: 'not a member of this tenant' })
       throw err

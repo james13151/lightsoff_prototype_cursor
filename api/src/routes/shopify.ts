@@ -8,25 +8,25 @@ import {
   normalizeShop,
   registerShopifyWebhooks,
   verifyShopifyWebhookHmac,
-  type ShopifyCredential,
 } from '../lib/shopify.js'
+import {
+  buildShopifyInstallUrl,
+  createOAuthState,
+  exchangeShopifyOAuthCode,
+  parseOAuthState,
+  shopifyOAuthErrorRedirect,
+  shopifyOAuthSuccessRedirect,
+} from '../lib/shopifyOAuth.js'
+import { loadShopifyCred, syncShopifyLocationsToWarehouses } from '../lib/shopifyInventory.js'
 
 function isRlsViolation(err: unknown): boolean {
   return (err as { code?: string }).code === '42501'
 }
 
-async function loadShopifyCred(userId: string, tenantId: string): Promise<ShopifyCredential> {
-  return withUser(userId, async (db) => {
-    const r = await db.query(
-      `select app.reveal_provider_credential($1, 'shopify') as secret`,
-      [tenantId],
-    )
-    const secret = r.rows[0]?.secret as { shop?: string; access_token?: string; scope?: string } | null
-    if (!secret?.shop || !secret?.access_token) {
-      throw new Error('Shopify not connected')
-    }
-    return { shop: normalizeShop(secret.shop), access_token: secret.access_token, scope: secret.scope }
-  })
+async function requireShopifyCred(userId: string, tenantId: string) {
+  const cred = await loadShopifyCred(userId, tenantId)
+  if (!cred) throw new Error('Shopify not connected')
+  return cred
 }
 
 export function shopifyRoutes(app: FastifyInstance) {
@@ -40,7 +40,7 @@ export function shopifyRoutes(app: FastifyInstance) {
         [tenant_id],
       )
       const row = cred.rows[0]
-      if (!row) return { connected: false }
+      if (!row) return { connected: false, oauth_available: Boolean(env.shopifyApiKey && env.shopifyApiSecret && env.apiPublicUrl) }
       let shop: string | null = null
       try {
         const secret = await db.query(`select app.reveal_provider_credential($1, 'shopify') as secret`, [tenant_id])
@@ -51,6 +51,7 @@ export function shopifyRoutes(app: FastifyInstance) {
         credential_id: row.id,
         label: row.label,
         shop,
+        oauth_available: Boolean(env.shopifyApiKey && env.shopifyApiSecret && env.apiPublicUrl),
         webhook_url: env.apiPublicUrl ? `${env.apiPublicUrl.replace(/\/$/, '')}/v1/webhooks/shopify` : null,
         updated_at: row.updated_at,
       }
@@ -75,6 +76,7 @@ export function shopifyRoutes(app: FastifyInstance) {
         ])
         return r.rows[0].id as string
       })
+      await syncShopifyLocationsToWarehouses(req.userId, tenant_id)
       return reply.code(201).send({ id, shop: normalized })
     } catch (err) {
       const message = (err as Error).message ?? ''
@@ -83,6 +85,27 @@ export function shopifyRoutes(app: FastifyInstance) {
     }
   })
 
+  app.get<{ Querystring: { tenant_id?: string; shop?: string } }>(
+    '/v1/shopify/oauth/install-url',
+    async (req, reply) => {
+      const { tenant_id, shop } = req.query
+      if (!tenant_id || !shop?.trim()) {
+        return reply.code(400).send({ error: 'tenant_id and shop are required' })
+      }
+      if (!env.shopifyApiKey || !env.shopifyApiSecret || !env.apiPublicUrl) {
+        return reply.code(400).send({
+          error: 'Shopify OAuth is not configured on the server (SHOPIFY_API_KEY, SHOPIFY_API_SECRET, API_PUBLIC_URL)',
+        })
+      }
+      try {
+        const state = createOAuthState(tenant_id, req.userId, shop)
+        return { install_url: buildShopifyInstallUrl(shop, state), shop: normalizeShop(shop) }
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message })
+      }
+    },
+  )
+
   app.post<{ Body: { tenant_id: string } }>('/v1/shopify/register-webhooks', async (req, reply) => {
     const { tenant_id } = req.body ?? {}
     if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
@@ -90,7 +113,7 @@ export function shopifyRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'API_PUBLIC_URL is not configured on the server' })
     }
     try {
-      const cred = await loadShopifyCred(req.userId, tenant_id)
+      const cred = await requireShopifyCred(req.userId, tenant_id)
       const callbackUrl = `${env.apiPublicUrl.replace(/\/$/, '')}/v1/webhooks/shopify`
       const results = await registerShopifyWebhooks(cred, callbackUrl)
       return { callback_url: callbackUrl, results }
@@ -105,7 +128,7 @@ export function shopifyRoutes(app: FastifyInstance) {
     const { tenant_id } = req.body ?? {}
     if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
     try {
-      const cred = await loadShopifyCred(req.userId, tenant_id)
+      const cred = await requireShopifyCred(req.userId, tenant_id)
       const products = await fetchShopifyProducts(cred, 100)
       const summary = await withUser(req.userId, async (db) => {
         let upserted = 0
@@ -178,7 +201,7 @@ export function shopifyRoutes(app: FastifyInstance) {
     const { tenant_id, limit } = req.body ?? {}
     if (!tenant_id) return reply.code(400).send({ error: 'tenant_id is required' })
     try {
-      const cred = await loadShopifyCred(req.userId, tenant_id)
+      const cred = await requireShopifyCred(req.userId, tenant_id)
       const orders = await fetchShopifyOrders(cred, { limit: limit ?? 50 })
       const ingested = await withUser(req.userId, async (db) => {
         const ids: string[] = []
@@ -262,7 +285,7 @@ export function shopifyRoutes(app: FastifyInstance) {
 
       if (sync_to_shopify !== false) {
         try {
-          const cred = await loadShopifyCred(req.userId, fulfillment.tenant_id)
+          const cred = await requireShopifyCred(req.userId, fulfillment.tenant_id)
           const shopifyFulfillment = await createShopifyFulfillment(cred, Number(fulfillment.shopify_order_id), {
             company: carrier ?? undefined,
             number: tracking_number ?? undefined,
@@ -347,4 +370,52 @@ export async function handleShopifyWebhook(req: FastifyRequest, rawBody: string)
   })
 
   return { status: 200, body: { ok: true, order_id: orderId, duplicate: orderId === null && topic.startsWith('orders/') } }
+}
+
+/** Public OAuth callback — exchange code and store credential. */
+export async function handleShopifyOAuthCallback(query: {
+  code?: string
+  shop?: string
+  state?: string
+  error?: string
+  error_description?: string
+}): Promise<{ redirect: string }> {
+  if (query.error) {
+    return { redirect: shopifyOAuthErrorRedirect(query.error_description ?? query.error) }
+  }
+  const { code, shop, state } = query
+  if (!code || !shop || !state) {
+    return { redirect: shopifyOAuthErrorRedirect('Missing code, shop, or state') }
+  }
+  try {
+    const parsed = parseOAuthState(state)
+    const normalized = normalizeShop(shop)
+    if (normalizeShop(parsed.shop) !== normalized) {
+      throw new Error('shop mismatch in oauth callback')
+    }
+    const token = await exchangeShopifyOAuthCode(normalized, code)
+    await withUser(parsed.userId, async (db) => {
+      await db.query('select app.store_credential($1, $2, $3, $4)', [
+        parsed.tenantId,
+        'shopify',
+        'oauth-store',
+        JSON.stringify({
+          shop: normalized,
+          access_token: token.access_token,
+          scope: token.scope,
+        }),
+      ])
+    })
+    await syncShopifyLocationsToWarehouses(parsed.userId, parsed.tenantId)
+    if (env.apiPublicUrl) {
+      const cred = await loadShopifyCred(parsed.userId, parsed.tenantId)
+      if (cred) {
+        const callbackUrl = `${env.apiPublicUrl.replace(/\/$/, '')}/v1/webhooks/shopify`
+        await registerShopifyWebhooks(cred, callbackUrl).catch(() => {})
+      }
+    }
+    return { redirect: shopifyOAuthSuccessRedirect(normalized) }
+  } catch (err) {
+    return { redirect: shopifyOAuthErrorRedirect((err as Error).message) }
+  }
 }

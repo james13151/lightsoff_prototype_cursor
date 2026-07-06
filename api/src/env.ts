@@ -16,4 +16,6 @@ export const env = {
   shopifyApiSecret: process.env.SHOPIFY_API_SECRET ?? '',
   // Public API base URL for webhook registration, e.g. https://lightsoff-api.onrender.com
   apiPublicUrl: process.env.API_PUBLIC_URL ?? '',
+  // Frontend URL for OAuth redirect after install, e.g. https://james13151.github.io/lightsoff_prototype_cursor
+  frontendUrl: process.env.FRONTEND_URL ?? process.env.VITE_FRONTEND_URL ?? '',
 }
