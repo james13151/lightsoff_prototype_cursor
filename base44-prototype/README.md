@@ -1,6 +1,6 @@
 # lights:off / OMB PIT Base44 Prototype
 
-This directory is the migrated GitHub/Base44 project for the lights:off Module 1 prototype. The earlier source repo was `/Users/karl/GitHub/lights-off-prototype`; this repo now carries the migrated implementation under `base44-prototype/`.
+This repository is the canonical GitHub/Base44 project for the lights:off prototype. The scratch planning repo at `/Users/karl/Documents/lights:off` should not be treated as an active implementation workspace after its docs have been copied here.
 
 ## About
 
@@ -45,9 +45,9 @@ Backend function source lives in `base44/functions/` plus shared backend utiliti
 
 ## Local Development
 
-**Prerequisites:**
+**Prerequisites:** 
 
-1. Clone the repository using the project's Git URL
+1. Clone the repository using the project's Git URL 
 2. Navigate to the project directory
 3. Install dependencies: `npm install`
 4. Create an `.env.local` file and set the right environment variables

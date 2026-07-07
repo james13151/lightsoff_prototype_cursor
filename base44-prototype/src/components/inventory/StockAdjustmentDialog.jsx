@@ -44,7 +44,7 @@ export default function StockAdjustmentDialog({ open, onClose, currentUser, onSa
   };
 
   const handleSelectProduct = (id) => {
-    setForm(f => {
+    setForm(f => { 
       const w = f.warehouse;
       setTimeout(() => loadCurrentQty(id, w), 0);
       return { ...f, sku_ref: id };
