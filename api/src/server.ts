@@ -5,6 +5,7 @@ import { withUser } from './db.js'
 import { inventoryRoutes } from './routes/inventory.js'
 import { financeRoutes } from './routes/finance.js'
 import { memberRoutes } from './routes/members.js'
+import { shopifyRoutes, handleShopifyWebhook, handleShopifyOAuthCallback } from './routes/shopify.js'
 import { registerDevAuth } from './devAuth.js'
 import { env } from './env.js'
 
@@ -19,6 +20,33 @@ export function buildServer() {
 
   app.get('/health', async () => ({ ok: true, service: 'lightsoff-api', devAuth: env.allowDevAuth }))
 
+  // Shopify webhooks — raw body required for HMAC verification
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    if (req.url?.startsWith('/v1/webhooks/shopify')) {
+      done(null, body)
+      return
+    }
+    try {
+      done(null, body ? JSON.parse(body as string) : {})
+    } catch (err) {
+      done(err as Error, undefined)
+    }
+  })
+
+  app.post('/v1/webhooks/shopify', async (req, reply) => {
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {})
+    const result = await handleShopifyWebhook(req, rawBody)
+    return reply.code(result.status).send(result.body)
+  })
+
+  app.get<{ Querystring: { code?: string; shop?: string; state?: string; error?: string; error_description?: string } }>(
+    '/v1/shopify/oauth/callback',
+    async (req, reply) => {
+      const result = await handleShopifyOAuthCallback(req.query)
+      return reply.redirect(result.redirect)
+    },
+  )
+
   registerDevAuth(app)
 
   app.register(async (authed) => {
@@ -27,6 +55,7 @@ export function buildServer() {
     inventoryRoutes(authed)
     financeRoutes(authed)
     memberRoutes(authed)
+    shopifyRoutes(authed)
 
     // ---- Tenants ----
 

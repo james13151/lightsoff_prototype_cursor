@@ -15,6 +15,7 @@ import { TeamView } from './components/TeamView'
 import { ThemeToggle } from './components/ThemeToggle'
 import { Reports } from './components/Reports'
 import { OmnichannelSetup } from './components/OmnichannelSetup'
+import { ShopifyView } from './components/ShopifyView'
 import { ROLE_LABELS } from './lib/permissions'
 
 export type View =
@@ -22,6 +23,7 @@ export type View =
   | 'reports'
   | 'inventory'
   | 'finance'
+  | 'shopify'
   | 'inbox'
   | 'marketing'
   | 'rnd'
@@ -41,6 +43,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string; group: string }[] = 
   { view: 'reports', label: 'Reports', icon: '📊', group: 'Surfaces' },
   { view: 'inventory', label: 'Inventory & Procurement', icon: '📦', group: 'Modules' },
   { view: 'finance', label: 'Finance', icon: '💰', group: 'Modules' },
+  { view: 'shopify', label: 'Shopify', icon: '🛍️', group: 'Modules' },
   { view: 'inbox', label: 'Unified Inbox', icon: '💬', group: 'Modules' },
   { view: 'marketing', label: 'Marketing', icon: '📣', group: 'Modules' },
   { view: 'rnd', label: 'R&D Kanban', icon: '🧪', group: 'Modules' },
@@ -88,6 +91,7 @@ export default function App({
     case 'reports': content = <Reports />; break
     case 'inventory': content = <Inventory />; break
     case 'finance': content = <Finance />; break
+    case 'shopify': content = <ShopifyView />; break
     case 'inbox': content = <Inbox focusId={nav.focusId} />; break
     case 'marketing': content = <Marketing />; break
     case 'rnd': content = <Kanban focusId={nav.focusId} />; break

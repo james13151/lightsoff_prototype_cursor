@@ -42,7 +42,7 @@ function eventModule(type: string): string {
   const map: Record<string, string> = {
     vendor: 'Inventory', po: 'Inventory', inventory: 'Inventory',
     bill: 'Finance', payment: 'Finance', journal: 'Finance', claim: 'Finance',
-    integration: 'System',
+    shopify: 'Shopify', fulfillment: 'Shopify', integration: 'System',
   }
   return map[prefix] ?? 'System'
 }
@@ -60,6 +60,11 @@ function eventSummary(type: string, payload: Record<string, unknown>): string {
     const delta = Number(payload.qty_delta)
     return `Stock adjusted ${delta > 0 ? '+' : ''}${delta}`
   }
+  if (type === 'shopify.order.received') return `Shopify order ${payload.order_number ?? payload.shopify_order_id} received`
+  if (type === 'shopify.products.synced') return `Synced ${payload.count} Shopify products`
+  if (type === 'fulfillment.shipped') return `Fulfillment shipped — ${payload.tracking_number ?? 'no tracking'}`
+  if (type === 'shopify.fulfillment.synced') return `Fulfillment synced to Shopify`
+  if (type === 'shopify.inventory.pushed') return `Shopify inventory ${Number(payload.qty_delta) > 0 ? '+' : ''}${payload.qty_delta}`
   return type
 }
 

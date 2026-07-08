@@ -128,6 +128,24 @@ To test Supabase auth locally, copy production `VITE_SUPABASE_*` values into `li
 
 ---
 
+## 4. Shopify integration
+
+1. Apply migrations `20260703070000_shopify_integration.sql` and `20260706080000_shopify_oauth_inventory.sql` in Supabase SQL editor.
+2. Create a **Shopify custom app** (Dev Dashboard) with redirect URL:
+   `https://<your-api-host>/v1/shopify/oauth/callback`
+3. On the API host, set:
+   - `SHOPIFY_API_KEY` — app client ID
+   - `SHOPIFY_API_SECRET` — app client secret (webhook HMAC + OAuth)
+   - `API_PUBLIC_URL` — public API base (e.g. `https://lightsoff-api.onrender.com`)
+   - `FRONTEND_URL` — GitHub Pages URL for post-install redirect
+4. In the app: **Shopify** → enter shop domain → **Install Shopify app** (OAuth), or paste a custom app token.
+5. **Sync products** — maps variants + `shopify_inventory_item_id`.
+6. **Pull orders** or wait for webhooks — paid orders reserve stock in LightsOff.
+7. **Receipts / adjustments** — stock changes push to Shopify via `inventory_levels/adjust`.
+8. **Mark shipped** — fulfillment + tracking syncs back to Shopify.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Fix |
